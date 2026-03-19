@@ -107,3 +107,27 @@ pub struct SkippedStep {
     /// 跳过原因
     pub reason: String,
 }
+
+/// 自检结果（check mode 返回）
+#[derive(Debug, Clone, Serialize)]
+pub struct WorkflowCheckResult {
+    /// 是否通过自检
+    pub passed: bool,
+    /// 缺失的必需步骤
+    pub missing_steps: Vec<MissingStep>,
+    /// 已完成的步骤
+    pub completed_steps: Vec<String>,
+    /// 自检消息
+    pub message: String,
+}
+
+/// 缺失的步骤
+#[derive(Debug, Clone, Serialize)]
+pub struct MissingStep {
+    /// 节点标识符
+    pub id: String,
+    /// 节点名称
+    pub name: String,
+    /// 该步骤的执行建议
+    pub action: String,
+}

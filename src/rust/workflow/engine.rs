@@ -163,6 +163,52 @@ fn build_reminder(complexity: &Complexity) -> String {
     }
 }
 
+/// 自检：检查 AI 是否完成了所有必需步骤
+///
+/// # 参数
+/// - `definition`: 工作流定义
+/// - `task_description`: 任务描述
+/// - `hint_complexity`: 复杂度（可选）
+/// - `completed_steps`: AI 报告已完成的步骤 ID 列表
+pub fn check_workflow(
+    definition: &WorkflowDefinition,
+    task_description: &str,
+    hint_complexity: Option<&str>,
+    completed_steps: &[String],
+) -> WorkflowCheckResult {
+    // 先获取建议的步骤
+    let hint = evaluate_workflow(definition, task_description, hint_complexity);
+
+    // 检查建议步骤中哪些未被完成
+    let mut missing_steps = Vec::new();
+
+    for step in &hint.suggested_steps {
+        if !completed_steps.iter().any(|c| c == &step.id) {
+            missing_steps.push(MissingStep {
+                id: step.id.clone(),
+                name: step.name.clone(),
+                action: step.action.clone(),
+            });
+        }
+    }
+
+    let passed = missing_steps.is_empty();
+
+    let message = if passed {
+        "✅ 所有建议步骤已完成，工作流执行正确".to_string()
+    } else {
+        let names: Vec<&str> = missing_steps.iter().map(|s| s.name.as_str()).collect();
+        format!("⚠️ 以下步骤尚未完成: {}", names.join("、"))
+    };
+
+    WorkflowCheckResult {
+        passed,
+        missing_steps,
+        completed_steps: completed_steps.to_vec(),
+        message,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

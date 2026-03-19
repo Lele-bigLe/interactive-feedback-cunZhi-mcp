@@ -13,7 +13,7 @@ use std::borrow::Cow;
 
 use crate::workflow::{
     WorkflowDefinition, WorkflowHintResult,
-    evaluate_workflow, load_workflow_definition,
+    evaluate_workflow, check_workflow, load_workflow_definition,
     loader::generate_workflow_rules_text,
 };
 
@@ -25,6 +25,18 @@ struct HintRequest {
     /// AI 自主判断的任务复杂度（可选）
     #[serde(default)]
     complexity: Option<String>,
+}
+
+/// check 工具的请求参数（自检模式）
+#[derive(Debug, serde::Deserialize)]
+struct CheckRequest {
+    /// 任务描述（与 hint 调用时一致）
+    task_description: String,
+    /// 复杂度（与 hint 调用时一致）
+    #[serde(default)]
+    complexity: Option<String>,
+    /// AI 已完成的步骤 ID 列表
+    completed_steps: Vec<String>,
 }
 
 /// 循 MCP Server
@@ -66,7 +78,7 @@ impl ServerHandler for XunServer {
             },
             // 将工作流规则直接放入 instructions，这样 AI 连接时就能看到
             instructions: Some(format!(
-                "工作流引导工具。任务开始时调用 hint 获取工作流建议，按建议执行，完成后调用寸止(zhi)确认。\n\n{}",
+                "工作流引导工具。任务开始时调用 hint 获取工作流建议，按建议执行，完成后调用寸止(zhi)确认。\n\n# 工作流规则\n\n## 执行节点\n\n{}\n\n## 自检\n\n任务完成前可调用 check 工具自检是否遗漏步骤。",
                 self.rules_text
             )),
         }
@@ -85,7 +97,9 @@ impl ServerHandler for XunServer {
         _request: Option<PaginatedRequestParam>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, McpError> {
-        // hint 工具 schema
+        let mut tools = Vec::new();
+
+        // hint 工具
         let hint_schema = serde_json::json!({
             "type": "object",
             "properties": {
@@ -102,13 +116,44 @@ impl ServerHandler for XunServer {
             "required": ["task_description"]
         });
 
-        let mut tools = Vec::new();
-
         if let serde_json::Value::Object(schema_map) = hint_schema {
             tools.push(Tool {
                 name: Cow::Borrowed("hint"),
                 description: Some(Cow::Borrowed(
                     "工作流引导工具。任务开始时调用，获取工作流建议（建议的步骤、可跳过的步骤、复杂度评估）"
+                )),
+                input_schema: Arc::new(schema_map),
+                annotations: None,
+            });
+        }
+
+        // check 工具（自检）
+        let check_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "task_description": {
+                    "type": "string",
+                    "description": "任务描述（与 hint 调用时一致）"
+                },
+                "complexity": {
+                    "type": "string",
+                    "enum": ["simple", "medium", "complex"],
+                    "description": "复杂度（与 hint 调用时一致，可选）"
+                },
+                "completed_steps": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "已完成的步骤 ID 列表，如 [\"memory_gate\", \"read_context\", \"execute\", \"gate\"]"
+                }
+            },
+            "required": ["task_description", "completed_steps"]
+        });
+
+        if let serde_json::Value::Object(schema_map) = check_schema {
+            tools.push(Tool {
+                name: Cow::Borrowed("check"),
+                description: Some(Cow::Borrowed(
+                    "工作流自检工具。任务完成前调用，检查是否遗漏了建议的执行步骤"
                 )),
                 input_schema: Arc::new(schema_map),
                 annotations: None,
@@ -126,36 +171,59 @@ impl ServerHandler for XunServer {
         request: CallToolRequestParam,
         _context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, McpError> {
+        let arguments_value = request
+            .arguments
+            .map(serde_json::Value::Object)
+            .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
+
         match request.name.as_ref() {
             "hint" => {
-                // 解析请求参数
-                let arguments_value = request
-                    .arguments
-                    .map(serde_json::Value::Object)
-                    .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
-
                 let hint_request: HintRequest = serde_json::from_value(arguments_value)
                     .map_err(|e| {
                         McpError::invalid_params(format!("参数解析失败: {}", e), None)
                     })?;
 
-                // 评估工作流
                 let result: WorkflowHintResult = evaluate_workflow(
                     &self.workflow_def,
                     &hint_request.task_description,
                     hint_request.complexity.as_deref(),
                 );
 
-                // 序列化结果
                 let result_json = serde_json::to_string_pretty(&result)
                     .map_err(|e| {
                         McpError::internal_error(format!("结果序列化失败: {}", e), None)
                     })?;
 
                 log::info!(
-                    "hint 工具调用: task=\"{}\" → complexity={}",
+                    "hint: task=\"{}\" → complexity={}",
                     hint_request.task_description,
                     result.complexity
+                );
+
+                Ok(CallToolResult::success(vec![Content::text(result_json)]))
+            }
+            "check" => {
+                let check_request: CheckRequest = serde_json::from_value(arguments_value)
+                    .map_err(|e| {
+                        McpError::invalid_params(format!("参数解析失败: {}", e), None)
+                    })?;
+
+                let result = check_workflow(
+                    &self.workflow_def,
+                    &check_request.task_description,
+                    check_request.complexity.as_deref(),
+                    &check_request.completed_steps,
+                );
+
+                let result_json = serde_json::to_string_pretty(&result)
+                    .map_err(|e| {
+                        McpError::internal_error(format!("结果序列化失败: {}", e), None)
+                    })?;
+
+                log::info!(
+                    "check: passed={}, missing={}",
+                    result.passed,
+                    result.missing_steps.len()
                 );
 
                 Ok(CallToolResult::success(vec![Content::text(result_json)]))
