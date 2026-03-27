@@ -4,6 +4,7 @@ use rmcp::{Error as McpError, model::*};
 use crate::mcp::{ZhiRequest, PopupRequest};
 use crate::mcp::handlers::{create_tauri_popup, parse_mcp_response};
 use crate::mcp::utils::{generate_request_id, popup_error};
+use crate::constants::mcp::REQUEST_TIMEOUT_MS;
 
 /// 智能代码审查交互工具
 ///
@@ -15,6 +16,10 @@ impl InteractionTool {
     pub async fn zhi(
         request: ZhiRequest,
     ) -> Result<CallToolResult, McpError> {
+        let timeout_ms = crate::config::load_standalone_config()
+            .map(|config| config.mcp_config.request_timeout_ms)
+            .unwrap_or(REQUEST_TIMEOUT_MS);
+
         let popup_request = PopupRequest {
             id: generate_request_id(),
             message: request.message,
@@ -24,6 +29,10 @@ impl InteractionTool {
                 Some(request.predefined_options)
             },
             is_markdown: request.is_markdown,
+            project_path: request.project_path,
+            project_name: None,
+            timeout_ms,
+            retry_count: 0,
         };
 
         match create_tauri_popup(&popup_request) {

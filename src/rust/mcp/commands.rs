@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use tauri::{AppHandle, State};
 
 use crate::config::{AppState, save_config};
-use crate::constants::mcp;
+use crate::constants::{mcp, validation::is_valid_popup_timeout};
 // use crate::mcp::tools::acemcp; // 已迁移到独立模块
 
 /// MCP工具配置
@@ -19,6 +19,11 @@ pub struct MCPToolConfig {
     pub has_config: bool, // 是否有配置选项
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct ZhiToolConfig {
+    pub request_timeout_ms: u64,
+}
+
 /// 获取MCP工具配置列表
 #[tauri::command]
 pub async fn get_mcp_tools_config(state: State<'_, AppState>) -> Result<Vec<MCPToolConfig>, String> {
@@ -27,17 +32,17 @@ pub async fn get_mcp_tools_config(state: State<'_, AppState>) -> Result<Vec<MCPT
     // 动态构建工具配置列表
     let mut tools = Vec::new();
     
-    // 寸止工具 - 始终存在，无配置选项
+    // cunzhi 工具 - 始终存在，有配置选项
     tools.push(MCPToolConfig {
         id: mcp::TOOL_ZHI.to_string(),
-        name: "寸止".to_string(),
-        description: "智能代码审查交互工具，支持预定义选项、自由文本输入和图片上传".to_string(),
+        name: "cunzhi".to_string(),
+        description: "交互确认工具，支持项目级倒计时、防重复发起、自由输入和图片上传".to_string(),
         enabled: config.mcp_config.tools.get(mcp::TOOL_ZHI).copied().unwrap_or(true),
         can_disable: false, // 寸止工具是必需的
         icon: "i-carbon-chat text-lg text-blue-600 dark:text-blue-400".to_string(),
         icon_bg: "bg-blue-100 dark:bg-blue-900".to_string(),
         dark_icon_bg: "dark:bg-blue-800".to_string(),
-        has_config: false, // 寸止工具没有配置选项
+        has_config: true, // 寸止工具有配置选项
     });
     
     // 记忆管理工具 - 始终存在，无配置选项
@@ -70,6 +75,38 @@ pub async fn get_mcp_tools_config(state: State<'_, AppState>) -> Result<Vec<MCPT
     tools.sort_by(|a, b| b.enabled.cmp(&a.enabled));
     
     Ok(tools)
+}
+
+/// 获取寸止工具配置
+#[tauri::command]
+pub async fn get_zhi_tool_config(state: State<'_, AppState>) -> Result<ZhiToolConfig, String> {
+    let config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+    Ok(ZhiToolConfig {
+        request_timeout_ms: config.mcp_config.request_timeout_ms,
+    })
+}
+
+/// 保存寸止工具配置
+#[tauri::command]
+pub async fn set_zhi_tool_config(
+    request_timeout_ms: u64,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    if !is_valid_popup_timeout(request_timeout_ms) {
+        return Err(format!("无效的倒计时时间: {}ms（允许范围 1000ms - 3600000ms）", request_timeout_ms));
+    }
+
+    {
+        let mut config = state.config.lock().map_err(|e| format!("获取配置失败: {}", e))?;
+        config.mcp_config.request_timeout_ms = request_timeout_ms;
+    }
+
+    save_config(&state, &app).await
+        .map_err(|e| format!("保存配置失败: {}", e))?;
+
+    log::info!("寸止工具倒计时已更新为: {}ms", request_timeout_ms);
+    Ok(())
 }
 
 /// 设置MCP工具启用状态

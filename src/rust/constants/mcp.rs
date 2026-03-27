@@ -21,8 +21,8 @@ pub const DEFAULT_AUTO_CONTINUE_THRESHOLD: u32 = 1000;
 /// 默认继续提示词
 pub const DEFAULT_CONTINUE_PROMPT: &str = "请按照最佳实践继续";
 
-/// MCP 请求超时时间 (ms)
-pub const REQUEST_TIMEOUT_MS: u64 = 30000;
+/// 寸止弹窗默认倒计时时间 (ms)
+pub const REQUEST_TIMEOUT_MS: u64 = 600000;
 
 /// MCP 重试次数
 pub const MAX_RETRY_COUNT: u32 = 3;

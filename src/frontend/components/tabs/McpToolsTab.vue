@@ -17,6 +17,9 @@ const needsReconnect = ref(false)
 // 工具配置弹窗状态
 const showToolConfigModal = ref(false)
 const currentToolId = ref('')
+const zhiConfig = ref({
+  request_timeout_minutes: 10,
+})
 const acemcpConfig = ref({
   base_url: '',
   token: '',
@@ -195,12 +198,34 @@ async function toggleTool(toolId: string) {
 async function openToolConfig(toolId: string) {
   currentToolId.value = toolId
 
+  if (toolId === 'zhi') {
+    await loadZhiConfig()
+  }
+
   // 如果是代码搜索工具，加载当前配置
   if (toolId === 'sou') {
     await loadAcemcpConfig()
   }
 
   showToolConfigModal.value = true
+}
+
+// 加载寸止配置
+async function loadZhiConfig() {
+  try {
+    const config = await invoke('get_zhi_tool_config') as {
+      request_timeout_ms: number
+    }
+
+    zhiConfig.value = {
+      request_timeout_minutes: Math.max(1, Math.round((config.request_timeout_ms || 600000) / 60000)),
+    }
+  }
+  catch (err) {
+    if (message) {
+      message.error(`加载 cunzhi 配置失败: ${err}`)
+    }
+  }
 }
 
 // 加载acemcp配置
@@ -280,10 +305,30 @@ async function saveAcemcpConfig() {
 
 // 保存当前工具配置
 async function saveCurrentToolConfig() {
-  if (currentToolId.value === 'sou') {
+  if (currentToolId.value === 'zhi') {
+    await saveZhiConfig()
+  }
+  else if (currentToolId.value === 'sou') {
     await saveAcemcpConfig()
   }
   // 未来可以添加其他工具的保存逻辑
+}
+
+// 保存寸止配置
+async function saveZhiConfig() {
+  try {
+    const timeoutMinutes = Math.max(1, Math.round(zhiConfig.value.request_timeout_minutes || 10))
+    await invoke('set_zhi_tool_config', {
+      requestTimeoutMs: timeoutMinutes * 60 * 1000,
+    })
+    zhiConfig.value.request_timeout_minutes = timeoutMinutes
+    message.success('cunzhi 倒计时配置已保存')
+  }
+  catch (err) {
+    if (message) {
+      message.error(`保存 cunzhi 配置失败: ${err}`)
+    }
+  }
 }
 
 // 测试连接
@@ -397,7 +442,7 @@ watch(() => acemcpConfig.value.text_extensions, (list) => {
         <template #icon>
           <div class="i-carbon-connection-signal text-lg" />
         </template>
-        MCP工具配置已更改，请在您的MCP客户端中重新连接寸止服务以使更改生效。
+        MCP工具配置已更改，请在您的MCP客户端中重新连接 cunzhi 服务以使更改生效。
       </n-alert>
 
       <!-- 加载状态 -->
@@ -460,7 +505,7 @@ watch(() => acemcpConfig.value.text_extensions, (list) => {
             <div class="flex flex-shrink-0 ml-4 gap-2 items-center">
               <!-- 设置按钮 - 只有有配置的工具才显示 -->
               <n-button
-                v-if="tool.can_disable && tool.has_config" size="small" quaternary circle
+                v-if="tool.has_config" size="small" quaternary circle
                 @click="openToolConfig(tool.id)"
               >
                 <template #icon>
@@ -491,8 +536,50 @@ watch(() => acemcpConfig.value.text_extensions, (list) => {
       v-model:show="showToolConfigModal" preset="card" :closable="true" :mask-closable="true"
       :title="`${getCurrentToolName()} 工具配置`" style="width: 800px" :bordered="false" size="huge"
     >
+      <!-- cunzhi 工具配置 -->
+      <div v-if="currentToolId === 'zhi'">
+        <n-space vertical size="large">
+          <n-alert type="info" title="cunzhi 倒计时配置">
+            <template #icon>
+              <div class="i-carbon-timer text-lg" />
+            </template>
+            设置入口：MCP 工具 → cunzhi → 右侧齿轮。默认倒计时 10 分钟，到期后若用户没有反应会自动重新发起；同一项目在倒计时未结束前不可重复发起。
+          </n-alert>
+
+          <n-card size="small">
+            <template #header>
+              <div class="font-medium">
+                倒计时设置
+              </div>
+            </template>
+
+            <n-space vertical size="large">
+              <n-form-item label="默认倒计时（分钟）">
+                <n-input-number
+                  v-model:value="zhiConfig.request_timeout_minutes"
+                  :min="1"
+                  :max="60"
+                  :precision="0"
+                  placeholder="10"
+                />
+                <template #feedback>
+                  作用于新的 cunzhi 请求。允许范围 1 - 60 分钟，默认 10 分钟。
+                </template>
+              </n-form-item>
+
+              <n-alert type="warning" title="生效说明">
+                <template #icon>
+                  <div class="i-carbon-warning" />
+                </template>
+                修改后会写入本地配置文件，新发起的 cunzhi 请求会使用新的倒计时时间。
+              </n-alert>
+            </n-space>
+          </n-card>
+        </n-space>
+      </div>
+
       <!-- 代码搜索工具配置 -->
-      <div v-if="currentToolId === 'sou'">
+      <div v-else-if="currentToolId === 'sou'">
         <n-tabs type="line" animated>
           <!-- 基础配置标签页 -->
           <n-tab-pane name="basic" tab="基础配置">
@@ -668,7 +755,7 @@ watch(() => acemcpConfig.value.text_extensions, (list) => {
           <n-button @click="showToolConfigModal = false">
             取消
           </n-button>
-          <n-button v-if="currentToolId === 'sou'" type="primary" @click="saveCurrentToolConfig">
+          <n-button v-if="currentToolId === 'zhi' || currentToolId === 'sou'" type="primary" @click="saveCurrentToolConfig">
             保存配置
           </n-button>
         </n-space>

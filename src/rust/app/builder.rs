@@ -61,7 +61,9 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
 
             // MCP 命令
             get_mcp_tools_config,
+            get_zhi_tool_config,
             set_mcp_tool_enabled,
+            set_zhi_tool_config,
             get_mcp_tools_status,
             reset_mcp_tools_config,
             send_mcp_response,
@@ -71,6 +73,7 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
             build_mcp_send_response,
             build_mcp_continue_response,
             create_test_popup,
+            sync_popup_timer_state,
             
             // acemcp命令（迁移至 tools::acemcp::commands）
             crate::mcp::tools::acemcp::commands::get_acemcp_config,

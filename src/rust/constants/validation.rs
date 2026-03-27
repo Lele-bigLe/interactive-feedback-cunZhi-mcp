@@ -73,6 +73,11 @@ pub fn is_valid_timeout(timeout_ms: u64) -> bool {
     is_in_range(timeout_ms, 100, 300000) // 100ms 到 5分钟
 }
 
+/// 验证寸止弹窗倒计时是否有效
+pub fn is_valid_popup_timeout(timeout_ms: u64) -> bool {
+    is_in_range(timeout_ms, 1000, 3600000) // 1秒 到 60分钟
+}
+
 /// 验证重试次数是否有效
 pub fn is_valid_retry_count(count: u32) -> bool {
     count <= network::MAX_RETRY_COUNT

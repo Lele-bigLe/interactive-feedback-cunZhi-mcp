@@ -102,6 +102,10 @@ impl ServerHandler for ZhiServer {
                 "is_markdown": {
                     "type": "boolean",
                     "description": "消息是否为Markdown格式，默认为true"
+                },
+                "project_path": {
+                    "type": "string",
+                    "description": "项目路径（可选，建议传入 git 根目录绝对路径，用于同项目防重复和超时重发）"
                 }
             },
             "required": ["message"]

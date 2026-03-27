@@ -5,6 +5,10 @@ export interface McpRequest {
   message: string
   predefined_options?: string[]
   is_markdown?: boolean
+  project_path?: string
+  project_name?: string
+  timeout_ms?: number
+  retry_count?: number
 }
 
 // 自定义prompt类型定义

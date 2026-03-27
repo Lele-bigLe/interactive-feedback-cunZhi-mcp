@@ -65,14 +65,30 @@ const selectedOptions = ref<string[]>([])
 const userInput = ref('')
 const draggedImages = ref<string[]>([])
 const inputRef = ref()
+const countdownRemainingMs = ref(0)
+const countdownDeadline = ref<number | null>(null)
+const countdownPaused = ref(false)
+let countdownTimer: ReturnType<typeof window.setInterval> | null = null
 
 // 继续回复配置
 const continueReplyEnabled = ref(true)
 const continuePrompt = ref('请按照最佳实践继续')
+const defaultTimeoutMs = 600000
 
 // 计算属性
 const isVisible = computed(() => !!props.request)
 const hasOptions = computed(() => (props.request?.predefined_options?.length ?? 0) > 0)
+const timeoutMs = computed(() => props.request?.timeout_ms ?? defaultTimeoutMs)
+const hasCountdown = computed(() => timeoutMs.value > 0)
+const projectName = computed(() => props.request?.project_name || '当前项目')
+const countdownText = computed(() => formatCountdown(countdownRemainingMs.value))
+const isCountdownWarning = computed(() => countdownRemainingMs.value <= 10000)
+const countdownStatusText = computed(() => {
+  if (countdownPaused.value) {
+    return '计时已暂停'
+  }
+  return isCountdownWarning.value ? '即将过时，若无响应会自动重新发起' : '当前请求倒计时进行中'
+})
 const canSubmit = computed(() => {
   if (hasOptions.value) {
     return selectedOptions.value.length > 0 || userInput.value.trim().length > 0 || draggedImages.value.length > 0
@@ -100,6 +116,111 @@ async function loadReplyConfig() {
   }
 }
 
+function formatCountdown(remainingMs: number) {
+  const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000))
+  const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0')
+  const seconds = String(totalSeconds % 60).padStart(2, '0')
+  return `${minutes}:${seconds}`
+}
+
+function clearCountdownTimer() {
+  if (countdownTimer) {
+    window.clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+}
+
+async function syncTimerState(paused: boolean, remainingMs: number) {
+  if (!props.request || props.mockMode)
+    return
+
+  try {
+    await invoke('sync_popup_timer_state', {
+      request: props.request,
+      remainingMs: Math.max(1000, remainingMs),
+      paused,
+    })
+  }
+  catch (error) {
+    console.error('同步弹窗计时状态失败:', error)
+  }
+}
+
+function startCountdown() {
+  clearCountdownTimer()
+
+  if (!props.request || !hasCountdown.value) {
+    countdownRemainingMs.value = 0
+    countdownDeadline.value = null
+    countdownPaused.value = false
+    return
+  }
+
+  countdownPaused.value = false
+  countdownDeadline.value = Date.now() + timeoutMs.value
+  countdownRemainingMs.value = timeoutMs.value
+
+  countdownTimer = window.setInterval(() => {
+    updateCountdown()
+  }, 250)
+}
+
+function updateCountdown() {
+  if (countdownPaused.value) {
+    return
+  }
+
+  if (!countdownDeadline.value) {
+    countdownRemainingMs.value = 0
+    return
+  }
+
+  const remaining = countdownDeadline.value - Date.now()
+  countdownRemainingMs.value = Math.max(0, remaining)
+
+  if (remaining <= 0) {
+    clearCountdownTimer()
+    void handleTimeout()
+  }
+}
+
+async function pauseCountdown() {
+  if (!hasCountdown.value || countdownPaused.value)
+    return
+
+  updateCountdown()
+  clearCountdownTimer()
+  countdownPaused.value = true
+  countdownDeadline.value = null
+  await syncTimerState(true, countdownRemainingMs.value)
+}
+
+async function resumeCountdown() {
+  if (!hasCountdown.value || !countdownPaused.value)
+    return
+
+  countdownPaused.value = false
+  countdownDeadline.value = Date.now() + countdownRemainingMs.value
+  countdownTimer = window.setInterval(() => {
+    updateCountdown()
+  }, 250)
+  await syncTimerState(false, countdownRemainingMs.value)
+}
+
+async function resetCountdown() {
+  if (!hasCountdown.value)
+    return
+
+  clearCountdownTimer()
+  countdownPaused.value = false
+  countdownRemainingMs.value = timeoutMs.value
+  countdownDeadline.value = Date.now() + timeoutMs.value
+  countdownTimer = window.setInterval(() => {
+    updateCountdown()
+  }, 250)
+  await syncTimerState(false, timeoutMs.value)
+}
+
 // 监听配置变化（当从设置页面切换回来时）
 watch(() => props.appConfig.reply, (newReplyConfig) => {
   if (newReplyConfig) {
@@ -113,14 +234,21 @@ let telegramUnlisten: (() => void) | null = null
 
 // 监听请求变化
 watch(() => props.request, (newRequest) => {
+  clearCountdownTimer()
   if (newRequest) {
     resetForm()
     loading.value = true
     // 每次显示弹窗时重新加载配置
     loadReplyConfig()
+    startCountdown()
     setTimeout(() => {
       loading.value = false
     }, 300)
+  }
+  else {
+    countdownRemainingMs.value = 0
+    countdownDeadline.value = null
+    countdownPaused.value = false
   }
 }, { immediate: true })
 
@@ -201,6 +329,7 @@ onMounted(() => {
 
 // 组件卸载时清理监听器
 onUnmounted(() => {
+  clearCountdownTimer()
   if (telegramUnlisten) {
     telegramUnlisten()
   }
@@ -212,6 +341,45 @@ function resetForm() {
   userInput.value = ''
   draggedImages.value = []
   submitting.value = false
+  countdownPaused.value = false
+}
+
+async function handleTimeout() {
+  if (submitting.value || !props.request) {
+    return
+  }
+
+  submitting.value = true
+
+  try {
+    const response = {
+      user_input: null,
+      selected_options: [],
+      images: [],
+      metadata: {
+        timestamp: new Date().toISOString(),
+        request_id: props.request.id || null,
+        source: 'popup_timeout',
+      },
+    }
+
+    if (props.mockMode) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      message.warning('倒计时已结束，模拟自动重发')
+    }
+    else {
+      await invoke('send_mcp_response', { response })
+      await invoke('exit_app')
+    }
+
+    emit('response', response)
+  }
+  catch (error) {
+    console.error('发送超时响应失败:', error)
+    message.error('超时处理失败，请重试')
+    submitting.value = false
+    startCountdown()
+  }
 }
 
 // 处理提交
@@ -393,6 +561,43 @@ Here is my original instruction:
     <div class="flex-1 overflow-y-auto scrollbar-thin">
       <!-- 消息内容 - 允许选中 -->
       <div class="mx-2 mt-2 mb-1 px-4 py-3 bg-black-100 rounded-lg select-text" data-guide="popup-content">
+        <div v-if="hasCountdown" class="mb-3 rounded-lg border border-black-200 bg-black px-3 py-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-xs text-gray-400">
+                {{ projectName }}
+              </div>
+              <div class="text-sm" :class="isCountdownWarning ? 'text-amber-400' : 'text-white'">
+                {{ countdownStatusText }}
+              </div>
+            </div>
+            <div class="text-right text-lg font-semibold tabular-nums" :class="isCountdownWarning ? 'text-amber-400' : 'text-primary-400'">
+              {{ countdownText }}
+            </div>
+          </div>
+          <div class="mt-3 flex items-center gap-2">
+            <n-button
+              size="small"
+              secondary
+              @click="countdownPaused ? resumeCountdown() : pauseCountdown()"
+            >
+              <template #icon>
+                <div :class="countdownPaused ? 'i-carbon-play-filled-alt' : 'i-carbon-pause-filled'" class="w-4 h-4" />
+              </template>
+              {{ countdownPaused ? '继续计时' : '暂停计时' }}
+            </n-button>
+            <n-button
+              size="small"
+              quaternary
+              @click="resetCountdown"
+            >
+              <template #icon>
+                <div class="i-carbon-renew w-4 h-4" />
+              </template>
+              重新计时
+            </n-button>
+          </div>
+        </div>
         <PopupContent :request="request" :loading="loading" :current-theme="props.appConfig.theme" @quote-message="handleQuoteMessage" />
       </div>
 
@@ -410,6 +615,7 @@ Here is my original instruction:
       <PopupActions
         :request="request" :loading="loading" :submitting="submitting" :can-submit="canSubmit"
         :continue-reply-enabled="continueReplyEnabled" :input-status-text="inputStatusText"
+        :countdown-text="hasCountdown ? countdownText : ''" :countdown-paused="countdownPaused"
         @submit="handleSubmit" @continue="handleContinue" @enhance="handleEnhance"
       />
     </div>

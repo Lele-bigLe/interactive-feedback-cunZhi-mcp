@@ -94,12 +94,15 @@ check_global_cli() {
     local cunzhi_found=false
     local dengxiaxia_found=false
 
-    # 检查寸止
-    if command -v 寸止 &> /dev/null; then
+    # 检查 zhi / 寸止
+    if command -v zhi &> /dev/null; then
+        echo -e "${GREEN}✅ 找到全局 zhi CLI: $(which zhi)${NC}"
+        cunzhi_found=true
+    elif command -v 寸止 &> /dev/null; then
         echo -e "${GREEN}✅ 找到全局 寸止 CLI: $(which 寸止)${NC}"
         cunzhi_found=true
     else
-        echo -e "${RED}❌ 未找到全局 寸止 CLI${NC}"
+        echo -e "${RED}❌ 未找到全局 zhi/寸止 CLI${NC}"
     fi
 
     # 检查等一下
@@ -188,8 +191,8 @@ check_cli_tools() {
 
     echo -e "${YELLOW}📋 检查本地CLI工具 (${BUILD_TYPE})...${NC}"
 
-    if [[ ! -f "$CLI_PATH/寸止" ]]; then
-        echo -e "${RED}❌ 未找到 寸止 CLI工具${NC}"
+    if [[ ! -f "$CLI_PATH/zhi" ]] && [[ ! -f "$CLI_PATH/寸止" ]]; then
+        echo -e "${RED}❌ 未找到 zhi/寸止 CLI工具${NC}"
         if [[ "$BUILD_TYPE" == "release" ]]; then
             echo -e "${YELLOW}💡 请先编译项目: cargo build --release${NC}"
         else
@@ -225,7 +228,12 @@ check_cli_tools() {
     fi
 
     # 检查执行权限
-    if [[ ! -x "$CLI_PATH/寸止" ]]; then
+    if [[ -f "$CLI_PATH/zhi" ]] && [[ ! -x "$CLI_PATH/zhi" ]]; then
+        echo -e "${YELLOW}⚠️  zhi CLI工具没有执行权限，正在添加...${NC}"
+        chmod +x "$CLI_PATH/zhi"
+    fi
+
+    if [[ -f "$CLI_PATH/寸止" ]] && [[ ! -x "$CLI_PATH/寸止" ]]; then
         echo -e "${YELLOW}⚠️  寸止 CLI工具没有执行权限，正在添加...${NC}"
         chmod +x "$CLI_PATH/寸止"
     fi
@@ -237,7 +245,12 @@ check_cli_tools() {
 
     echo -e "${GREEN}✅ 本地CLI工具检查完成 (${BUILD_TYPE})${NC}"
     echo -e "   构建类型: ${BUILD_TYPE}"
-    echo -e "   寸止: $CLI_PATH/寸止"
+    if [[ -f "$CLI_PATH/zhi" ]]; then
+        echo -e "   zhi: $CLI_PATH/zhi"
+    fi
+    if [[ -f "$CLI_PATH/寸止" ]]; then
+        echo -e "   寸止: $CLI_PATH/寸止"
+    fi
     echo -e "   等一下: $CLI_PATH/等一下"
 }
 
@@ -415,15 +428,15 @@ show_cli_help() {
     echo -e "${YELLOW}📖 CLI工具帮助信息:${NC}"
     echo ""
 
-    local cunzhi_cmd=$(get_cli_command "寸止")
+    local cunzhi_cmd=$(get_cli_command "zhi")
     local dengxiaxia_cmd=$(get_cli_command "等一下")
 
-    echo -e "${BLUE}寸止 CLI:${NC}"
+    echo -e "${BLUE}zhi CLI:${NC}"
     echo -e "${BLUE}命令: $cunzhi_cmd${NC}"
     if $cunzhi_cmd --help 2>/dev/null; then
         echo -e "${GREEN}✅ 帮助信息显示完成${NC}"
     else
-        echo -e "${YELLOW}⚠️  寸止 CLI 无帮助信息或不支持 --help 参数${NC}"
+        echo -e "${YELLOW}⚠️  zhi CLI 无帮助信息或不支持 --help 参数${NC}"
         echo -e "${BLUE}尝试直接运行:${NC} $cunzhi_cmd"
     fi
     echo ""

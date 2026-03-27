@@ -108,6 +108,8 @@ pub struct ReplyConfig {
 pub struct McpConfig {
     #[serde(default = "default_mcp_tools")]
     pub tools: HashMap<String, bool>, // MCP工具启用状态
+    #[serde(default = "default_mcp_request_timeout_ms")]
+    pub request_timeout_ms: u64, // 寸止弹窗倒计时时间（毫秒）
     pub acemcp_base_url: Option<String>, // acemcp API端点URL
     pub acemcp_token: Option<String>, // acemcp认证令牌
     pub acemcp_batch_size: Option<u32>, // acemcp批处理大小
@@ -244,6 +246,7 @@ pub fn default_audio_config() -> AudioConfig {
 pub fn default_mcp_config() -> McpConfig {
     McpConfig {
         tools: default_mcp_tools(),
+        request_timeout_ms: default_mcp_request_timeout_ms(),
         acemcp_base_url: None,
         acemcp_token: None,
         acemcp_batch_size: None,
@@ -340,6 +343,10 @@ pub fn default_auto_continue_threshold() -> u32 {
 
 pub fn default_continue_prompt() -> String {
     mcp::DEFAULT_CONTINUE_PROMPT.to_string()
+}
+
+pub fn default_mcp_request_timeout_ms() -> u64 {
+    mcp::REQUEST_TIMEOUT_MS
 }
 
 pub fn default_mcp_tools() -> HashMap<String, bool> {

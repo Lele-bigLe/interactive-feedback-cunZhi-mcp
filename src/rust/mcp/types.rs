@@ -11,10 +11,19 @@ pub struct ZhiRequest {
     #[schemars(description = "消息是否为Markdown格式，默认为true")]
     #[serde(default = "default_is_markdown")]
     pub is_markdown: bool,
+    #[schemars(description = "项目路径（可选，建议传入 git 根目录绝对路径，用于同项目防重复和超时重发）")]
+    #[serde(default)]
+    pub project_path: Option<String>,
 }
 
 fn default_is_markdown() -> bool {
     true
+}
+
+fn default_popup_timeout_ms() -> u64 {
+    crate::config::load_standalone_config()
+        .map(|config| config.mcp_config.request_timeout_ms)
+        .unwrap_or(crate::constants::mcp::REQUEST_TIMEOUT_MS)
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -45,12 +54,20 @@ fn default_category() -> String {
     "context".to_string()
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PopupRequest {
     pub id: String,
     pub message: String,
     pub predefined_options: Option<Vec<String>>,
     pub is_markdown: bool,
+    #[serde(default)]
+    pub project_path: Option<String>,
+    #[serde(default)]
+    pub project_name: Option<String>,
+    #[serde(default = "default_popup_timeout_ms")]
+    pub timeout_ms: u64,
+    #[serde(default)]
+    pub retry_count: u32,
 }
 
 /// 新的结构化响应数据格式

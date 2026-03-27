@@ -1,12 +1,12 @@
 use crate::config::{save_config, load_config, AppState, ReplyConfig, WindowConfig, CustomPrompt, CustomPromptConfig, ShortcutConfig, ShortcutBinding};
 use crate::constants::{window, ui, validation};
 use crate::mcp::types::{build_continue_response, build_send_response, ImageAttachment, PopupRequest};
-use crate::mcp::handlers::create_tauri_popup;
+use crate::mcp::handlers::{create_tauri_popup, update_project_popup_timer_state};
 use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]
 pub async fn get_app_info() -> Result<String, String> {
-    Ok(format!("寸止 v{}", env!("CARGO_PKG_VERSION")))
+    Ok(format!("cunzhi v{}", env!("CARGO_PKG_VERSION")))
 }
 
 #[tauri::command]
@@ -534,6 +534,17 @@ pub async fn create_test_popup(request: serde_json::Value) -> Result<String, Str
         Ok(response) => Ok(response),
         Err(e) => Err(format!("创建测试popup失败: {}", e))
     }
+}
+
+/// 同步弹窗计时状态
+#[tauri::command]
+pub fn sync_popup_timer_state(
+    request: PopupRequest,
+    remaining_ms: u64,
+    paused: bool,
+) -> Result<(), String> {
+    update_project_popup_timer_state(&request, remaining_ms, paused)
+        .map_err(|e| format!("同步弹窗计时状态失败: {}", e))
 }
 
 // 自定义prompt相关命令

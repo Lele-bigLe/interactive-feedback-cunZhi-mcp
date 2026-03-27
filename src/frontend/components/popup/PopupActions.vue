@@ -11,6 +11,8 @@ interface Props {
   connectionStatus?: string
   continueReplyEnabled?: boolean
   inputStatusText?: string
+  countdownText?: string
+  countdownPaused?: boolean
 }
 
 interface Emits {
@@ -26,6 +28,8 @@ const props = withDefaults(defineProps<Props>(), {
   connectionStatus: '已连接',
   continueReplyEnabled: true,
   inputStatusText: '',
+  countdownText: '',
+  countdownPaused: false,
 })
 
 const emit = defineEmits<Emits>()
@@ -114,6 +118,10 @@ onMounted(() => {
           <span class="font-medium">{{ connectionStatus }}</span>
           <span class="opacity-60">|</span>
           <span class="opacity-60">{{ statusText }}</span>
+          <template v-if="countdownText">
+            <span class="opacity-60">|</span>
+            <span class="font-medium text-amber-600">{{ countdownPaused ? '已暂停' : '剩余' }} {{ countdownText }}</span>
+          </template>
         </div>
       </div>
 
