@@ -13,12 +13,15 @@ interface Props {
   inputStatusText?: string
   countdownText?: string
   countdownPaused?: boolean
+  hasCountdown?: boolean
 }
 
 interface Emits {
   submit: []
   continue: []
   enhance: []
+  toggleCountdown: []
+  resetCountdown: []
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -30,6 +33,7 @@ const props = withDefaults(defineProps<Props>(), {
   inputStatusText: '',
   countdownText: '',
   countdownPaused: false,
+  hasCountdown: false,
 })
 
 const emit = defineEmits<Emits>()
@@ -102,6 +106,18 @@ function handleEnhance() {
   }
 }
 
+function handleToggleCountdown() {
+  if (!props.submitting) {
+    emit('toggleCountdown')
+  }
+}
+
+function handleResetCountdown() {
+  if (!props.submitting) {
+    emit('resetCountdown')
+  }
+}
+
 // 组件挂载时加载快捷键配置
 onMounted(() => {
   loadShortcutConfig()
@@ -110,10 +126,10 @@ onMounted(() => {
 
 <template>
   <div class="px-4 py-3 bg-gray-100 min-h-[60px] select-none">
-    <div v-if="!loading" class="flex justify-between items-center">
+    <div v-if="!loading" class="flex justify-between items-center gap-3">
       <!-- 左侧状态信息 -->
-      <div class="flex items-center">
-        <div class="flex items-center gap-2 text-xs text-gray-600">
+      <div class="flex items-center min-w-0 flex-1">
+        <div class="flex items-center gap-2 text-xs text-gray-600 min-w-0 flex-wrap">
           <div class="w-2 h-2 rounded-full bg-primary-500" />
           <span class="font-medium">{{ connectionStatus }}</span>
           <span class="opacity-60">|</span>
@@ -126,8 +142,33 @@ onMounted(() => {
       </div>
 
       <!-- 右侧操作按钮 -->
-      <div class="flex items-center" data-guide="popup-actions">
-        <n-space size="small">
+      <div class="flex items-center flex-shrink-0" data-guide="popup-actions">
+        <n-space size="small" align="center">
+          <template v-if="hasCountdown">
+            <n-button
+              size="small"
+              quaternary
+              :disabled="submitting"
+              @click="handleToggleCountdown"
+            >
+              <template #icon>
+                <div :class="countdownPaused ? 'i-carbon-play-filled-alt' : 'i-carbon-pause-filled'" class="w-4 h-4" />
+              </template>
+              {{ countdownPaused ? '继续' : '暂停' }}
+            </n-button>
+            <n-button
+              size="small"
+              quaternary
+              :disabled="submitting"
+              @click="handleResetCountdown"
+            >
+              <template #icon>
+                <div class="i-carbon-renew w-4 h-4" />
+              </template>
+              重置
+            </n-button>
+          </template>
+
           <!-- 增强按钮 -->
           <n-tooltip trigger="hover" placement="top">
             <template #trigger>

@@ -146,6 +146,15 @@ async function syncTimerState(paused: boolean, remainingMs: number) {
   }
 }
 
+function handleToggleCountdown() {
+  if (countdownPaused.value) {
+    void resumeCountdown()
+  }
+  else {
+    void pauseCountdown()
+  }
+}
+
 function startCountdown() {
   clearCountdownTimer()
 
@@ -561,46 +570,8 @@ Here is my original instruction:
     <div class="flex-1 overflow-y-auto scrollbar-thin">
       <!-- 消息内容 - 允许选中 -->
       <div class="mx-2 mt-2 mb-1 px-4 py-3 bg-black-100 rounded-lg select-text" data-guide="popup-content">
-        <div v-if="hasCountdown" class="mb-3 rounded-lg border border-black-200 bg-black px-3 py-3">
-          <div class="flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <div class="text-xs text-gray-400">
-                {{ projectName }}
-              </div>
-              <div class="text-sm" :class="isCountdownWarning ? 'text-amber-400' : 'text-white'">
-                {{ countdownStatusText }}
-              </div>
-            </div>
-            <div class="text-right text-lg font-semibold tabular-nums" :class="isCountdownWarning ? 'text-amber-400' : 'text-primary-400'">
-              {{ countdownText }}
-            </div>
-          </div>
-          <div class="mt-3 flex items-center gap-2">
-            <n-button
-              size="small"
-              secondary
-              @click="countdownPaused ? resumeCountdown() : pauseCountdown()"
-            >
-              <template #icon>
-                <div :class="countdownPaused ? 'i-carbon-play-filled-alt' : 'i-carbon-pause-filled'" class="w-4 h-4" />
-              </template>
-              {{ countdownPaused ? '继续计时' : '暂停计时' }}
-            </n-button>
-            <n-button
-              size="small"
-              quaternary
-              @click="resetCountdown"
-            >
-              <template #icon>
-                <div class="i-carbon-renew w-4 h-4" />
-              </template>
-              重新计时
-            </n-button>
-          </div>
-        </div>
         <PopupContent :request="request" :loading="loading" :current-theme="props.appConfig.theme" @quote-message="handleQuoteMessage" />
       </div>
-
       <!-- 输入和选项 - 允许选中 -->
       <div class="px-4 pb-3 bg-black select-text">
         <PopupInput
@@ -616,7 +587,9 @@ Here is my original instruction:
         :request="request" :loading="loading" :submitting="submitting" :can-submit="canSubmit"
         :continue-reply-enabled="continueReplyEnabled" :input-status-text="inputStatusText"
         :countdown-text="hasCountdown ? countdownText : ''" :countdown-paused="countdownPaused"
+        :has-countdown="hasCountdown"
         @submit="handleSubmit" @continue="handleContinue" @enhance="handleEnhance"
+        @toggle-countdown="handleToggleCountdown" @reset-countdown="resetCountdown"
       />
     </div>
   </div>

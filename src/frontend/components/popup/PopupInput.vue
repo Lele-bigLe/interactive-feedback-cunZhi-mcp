@@ -118,6 +118,8 @@ const message = useMessage()
 
 // 计算属性
 const hasOptions = computed(() => (props.request?.predefined_options?.length ?? 0) > 0)
+const hasQuickTemplates = computed(() => customPromptEnabled.value && sortablePrompts.value.length > 0)
+const hasContextAppend = computed(() => customPromptEnabled.value && conditionalPrompts.value.length > 0)
 const canSubmit = computed(() => {
   const hasOptionsSelected = selectedOptions.value.length > 0
   const hasInputText = userInput.value.trim().length > 0
@@ -647,6 +649,68 @@ defineExpose({
       </n-space>
     </div>
 
+    <!-- 快捷模板固定区 -->
+    <div v-if="!loading && hasQuickTemplates" class="space-y-2" data-guide="custom-prompts">
+      <div class="text-xs text-on-surface-secondary flex items-center gap-2">
+        <div class="i-carbon-bookmark w-3 h-3 text-primary-500" />
+        <span>快捷模板 (拖拽调整顺序):</span>
+      </div>
+      <div
+        ref="promptContainer"
+        data-prompt-container
+        class="flex flex-wrap gap-2"
+      >
+        <div
+          v-for="prompt in sortablePrompts"
+          :key="prompt.id"
+          :title="prompt.description || (prompt.content.trim() ? prompt.content : '清空输入框')"
+          class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-container-secondary hover:bg-container-tertiary rounded transition-all duration-200 select-none border border-gray-600 text-on-surface sortable-item"
+        >
+          <div class="drag-handle cursor-move p-0.5 rounded hover:bg-container-tertiary transition-colors">
+            <div class="i-carbon-drag-horizontal w-3 h-3" />
+          </div>
+          <div class="inline-flex items-center cursor-pointer" @click="handlePromptClick(prompt)">
+            <span>{{ prompt.name }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上下文追加工具栏 -->
+    <div v-if="!loading && hasContextAppend" class="space-y-2" data-guide="context-append">
+      <div class="text-xs text-on-surface-secondary flex items-center gap-2">
+        <div class="i-carbon-settings-adjust w-3 h-3 text-primary-500" />
+        <span>上下文追加:</span>
+      </div>
+      <div class="popup-toolbar-list">
+        <div
+          v-for="prompt in conditionalPrompts"
+          :key="prompt.id"
+          class="flex items-center justify-between p-2 bg-container-secondary rounded border border-gray-600 hover:bg-container-tertiary transition-colors text-xs"
+        >
+          <div class="flex-1 min-w-0 mr-2">
+            <div class="text-xs text-on-surface truncate font-medium" :title="prompt.condition_text || prompt.name">
+              {{ prompt.condition_text || prompt.name }}
+            </div>
+            <div
+              v-if="getConditionalDescription(prompt)"
+              class="text-xs text-primary-600 dark:text-primary-400 opacity-50 dark:opacity-60 mt-0.5 truncate leading-tight"
+              :title="getConditionalDescription(prompt)"
+            >
+              {{ getConditionalDescription(prompt) }}
+            </div>
+          </div>
+          <div class="flex-shrink-0">
+            <n-switch
+              :value="prompt.current_state ?? false"
+              size="small"
+              @update:value="(value: boolean) => handleConditionalToggle(prompt.id, value)"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 图片预览区域 -->
     <div v-if="!loading && uploadedImages.length > 0" class="space-y-3">
       <h4 class="text-sm font-medium text-white">
@@ -698,76 +762,12 @@ defineExpose({
         {{ hasOptions ? '补充说明 (可选)' : '请输入您的回复' }}
       </h4>
 
-      <!-- 自定义prompt按钮区域 -->
-      <div v-if="customPromptEnabled && customPrompts.length > 0" class="space-y-2" data-guide="custom-prompts">
-        <div class="text-xs text-on-surface-secondary flex items-center gap-2">
-          <div class="i-carbon-bookmark w-3 h-3 text-primary-500" />
-          <span>快捷模板 (拖拽调整顺序):</span>
-        </div>
-        <div
-          ref="promptContainer"
-          data-prompt-container
-          class="flex flex-wrap gap-2"
-        >
-          <div
-            v-for="prompt in sortablePrompts"
-            :key="prompt.id"
-            :title="prompt.description || (prompt.content.trim() ? prompt.content : '清空输入框')"
-            class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-container-secondary hover:bg-container-tertiary rounded transition-all duration-200 select-none border border-gray-600 text-on-surface sortable-item"
-          >
-            <!-- 拖拽手柄 -->
-            <div class="drag-handle cursor-move p-0.5 rounded hover:bg-container-tertiary transition-colors">
-              <div class="i-carbon-drag-horizontal w-3 h-3 text-on-surface-secondary" />
-            </div>
-
-            <!-- 按钮内容 -->
-            <div
-              class="inline-flex items-center cursor-pointer"
-              @click="handlePromptClick(prompt)"
-            >
-              <span>{{ prompt.name }}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 上下文追加区域 -->
-      <div v-if="customPromptEnabled && conditionalPrompts.length > 0" class="space-y-2" data-guide="context-append">
-        <div class="text-xs text-on-surface-secondary flex items-center gap-2">
-          <div class="i-carbon-settings-adjust w-3 h-3 text-primary-500" />
-          <span>上下文追加:</span>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div
-            v-for="prompt in conditionalPrompts"
-            :key="prompt.id"
-            class="flex items-center justify-between p-2 bg-container-secondary rounded border border-gray-600 hover:bg-container-tertiary transition-colors text-xs"
-          >
-            <div class="flex-1 min-w-0 mr-2">
-              <div class="text-xs text-on-surface truncate font-medium" :title="prompt.condition_text || prompt.name">
-                {{ prompt.condition_text || prompt.name }}
-              </div>
-              <div v-if="getConditionalDescription(prompt)" class="text-xs text-primary-600 dark:text-primary-400 opacity-50 dark:opacity-60 mt-0.5 truncate leading-tight" :title="getConditionalDescription(prompt)">
-                {{ getConditionalDescription(prompt) }}
-              </div>
-            </div>
-            <n-switch
-              :value="prompt.current_state ?? false"
-              size="small"
-              @update:value="(value: boolean) => handleConditionalToggle(prompt.id, value)"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- 图片提示区域 -->
       <div v-if="uploadedImages.length === 0" class="text-center">
         <div class="text-xs text-on-surface-secondary">
           💡 提示：可以在输入框中粘贴图片 ({{ pasteShortcut }})
         </div>
       </div>
 
-      <!-- 文本输入框 -->
       <n-input
         ref="textareaRef"
         v-model:value="userInput"
@@ -815,6 +815,18 @@ defineExpose({
 </template>
 
 <style scoped>
+.popup-toolbar-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (max-width: 767px) {
+  .popup-toolbar-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Sortable.js 拖拽样式 */
 .sortable-ghost {
   opacity: 0.5;
