@@ -27,45 +27,30 @@
 
 ## 🚀 开始使用
 
-### 方式一：快速安装（推荐）
+### 方式一：下载安装包（推荐）
 
-**macOS 用户：**
-```bash
-# 3 秒安装，无需等待编译
-brew tap imhuso/cunzhi && brew install cunzhi
-```
-
-> ⚠️ **故障排除**：如果遇到 404 下载错误，请执行以下步骤：
->
-> ```bash
-> # 清除旧的 tap 缓存
-> brew untap imhuso/cunzhi
-> # 重新安装
-> brew tap imhuso/cunzhi && brew install cunzhi
-> ```
->
-> **常见错误示例：**
-> ```
-> curl: (56) The requested URL returned error: 404
-> Error: cunzhi: Failed to download resource "cunzhi"
-> Download failed: https://github.com/imhuso/cunzhi/releases/download/v0.2.0/cunzhi-cli-v0.2.4-macos-aarch64.tar.gz
-> ```
->
-> 这通常是由于之前版本的缓存问题导致版本号不匹配。清除 tap 后重新安装即可解决。
-
-**Windows/Linux 用户：**
-推荐使用方式二手动下载，简单快捷！
-
-### 方式二：手动下载
-
-1. 访问 [Releases 页面](https://github.com/imhuso/cunzhi/releases)
+1. 访问 [Releases 页面](https://github.com/Lele-bigLe/interactive-feedback-cunZhi-mcp/releases)
 2. 下载适合你系统的版本：
-   - 🐧 **Linux**: `cunzhi-cli-v*-linux-x86_64.tar.gz`
-   - 🍎 **macOS (Intel)**: `cunzhi-cli-v*-macos-x86_64.tar.gz`
-   - 🍎 **macOS (Apple Silicon)**: `cunzhi-cli-v*-macos-aarch64.tar.gz`
-   - 🪟 **Windows**: `cunzhi-cli-v*-windows-x86_64.zip`
 
-3. 解压后将 `寸止` 和 `等一下` 添加到系统 PATH
+   | 平台 | 文件 | 说明 |
+   |------|------|------|
+   | 🪟 **Windows** | `cunzhi_*_x64-setup.exe` | 安装包（推荐） |
+   | 🪟 **Windows** | `cunzhi-cli-v*-windows-x86_64.zip` | 便携版 CLI |
+   | 🐧 **Linux** | `cunzhi-cli-v*-linux-x86_64.tar.gz` | CLI 二进制 |
+   | 🍎 **macOS (Intel)** | `cunzhi-cli-v*-macos-x86_64.tar.gz` | CLI 二进制 |
+   | 🍎 **macOS (Apple Silicon)** | `cunzhi-cli-v*-macos-aarch64.tar.gz` | CLI 二进制 |
+
+3. **Windows**：运行 `.exe` 安装包，按提示完成安装
+4. **macOS/Linux**：解压后将 `zhi` 和 `等一下` 添加到系统 PATH
+
+### 方式二：从源码构建
+
+```bash
+git clone https://github.com/Lele-bigLe/interactive-feedback-cunZhi-mcp.git
+cd interactive-feedback-cunZhi-mcp
+pnpm install
+pnpm tauri:build
+```
 
 ## ⚡ 快速上手
 
@@ -76,12 +61,17 @@ brew tap imhuso/cunzhi && brew install cunzhi
 ```json
 {
   "mcpServers": {
-    "寸止": {
-      "command": "寸止"
+    "cunzhi": {
+      "command": "zhi"
     }
   }
 }
 ```
+
+> 💡 如果 `zhi` 未加入 PATH，请使用绝对路径，例如：
+> ```json
+> { "command": "C:/Users/<你的用户名>/AppData/Local/cunzhi/zhi.exe" }
+> ```
 
 ### 第二步：打开设置界面
 
@@ -107,8 +97,14 @@ brew tap imhuso/cunzhi && brew install cunzhi
 
 寸止提供了多个 MCP 工具来增强 AI 助手的能力：
 
-- **代码搜索工具**：基于 ACE 的语义代码搜索，帮助 AI 理解项目代码结构
-  - 📖 [详细使用说明](./ACEMCP.md)
+| 工具 | 命令 | 功能 |
+|------|------|------|
+| **智能交互** | `zhi` | 弹窗收集用户反馈，支持 Markdown、图片上传 |
+| **记忆管理** | `ji` | 按项目存储开发规范和偏好 |
+| **代码搜索** | `sou` | 基于 ACE 的语义代码搜索 |
+
+- 📖 [代码搜索工具详细使用说明](./ACEMCP.md)
+- 📖 [MCP 配置说明](./MCP_CONFIG.md)
 
 ### 🙏 致谢
 
@@ -122,8 +118,8 @@ brew tap imhuso/cunzhi && brew install cunzhi
 
 ### 🛠️ 本地开发
 ```bash
-git clone https://github.com/imhuso/cunzhi.git
-cd cunzhi
+git clone https://github.com/Lele-bigLe/interactive-feedback-cunZhi-mcp.git
+cd interactive-feedback-cunZhi-mcp
 pnpm install
 pnpm tauri:dev
 ```
@@ -131,5 +127,3 @@ pnpm tauri:dev
 ## 📄 开源协议
 
 MIT License - 自由使用，欢迎贡献！
-
-</div>

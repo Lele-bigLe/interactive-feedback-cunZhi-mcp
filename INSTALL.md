@@ -2,49 +2,51 @@
 
 ## 快速安装
 
-### 方式一：使用安装脚本（推荐）
+### 方式一：下载预编译版本（推荐）
+
+从 [Releases](https://github.com/Lele-bigLe/interactive-feedback-cunZhi-mcp/releases) 页面下载对应平台的预编译版本：
+
+| 平台 | 文件 | 说明 |
+|------|------|------|
+| **Windows** | `cunzhi_*_x64-setup.exe` | 安装包（推荐，自动配置 PATH） |
+| **Windows** | `cunzhi-cli-v*-windows-x86_64.zip` | 便携版 CLI |
+| **Linux** | `cunzhi-cli-v*-linux-x86_64.tar.gz` | CLI 二进制 |
+| **macOS (Intel)** | `cunzhi-cli-v*-macos-x86_64.tar.gz` | CLI 二进制 |
+| **macOS (Apple Silicon)** | `cunzhi-cli-v*-macos-aarch64.tar.gz` | CLI 二进制 |
+
+#### Windows 安装步骤：
+
+1. 下载 `cunzhi_*_x64-setup.exe`
+2. 双击运行安装包
+3. 按提示完成安装（默认安装到 `%LOCALAPPDATA%\cunzhi`）
+
+#### macOS / Linux 安装步骤：
+
+```bash
+# 下载并解压（以 Linux 为例）
+tar -xzf cunzhi-cli-v*-linux-x86_64.tar.gz
+
+# 将二进制文件复制到系统路径
+sudo cp zhi 等一下 /usr/local/bin/
+```
+
+### 方式二：使用安装脚本
 
 ```bash
 # 克隆仓库
-git clone https://github.com/imhuso/cunzhi.git
-cd cunzhi
+git clone https://github.com/Lele-bigLe/interactive-feedback-cunZhi-mcp.git
+cd interactive-feedback-cunZhi-mcp
 
 # 运行安装脚本
 chmod +x install.sh
 ./install.sh
 ```
 
-### 方式二：下载预编译版本
-
-从 [Releases](https://github.com/imhuso/cunzhi/releases) 页面下载对应平台的预编译版本：
-
-- **Linux**: `cunzhi-linux-x86_64.tar.gz`
-- **macOS**: `cunzhi-macos-universal.tar.gz`
-- **Windows**: `cunzhi-windows-x86_64.zip`
-
-#### 安装步骤：
-
-1. 下载对应平台的压缩包
-2. 解压到任意目录
-3. 将解压目录添加到 PATH 环境变量
-
-```bash
-# Linux/macOS 示例
-tar -xzf cunzhi-linux-x86_64.tar.gz
-sudo cp 等一下 寸止 /usr/local/bin/
-```
-
-```powershell
-# Windows 示例
-# 解压 zip 文件到 C:\cunzhi
-# 将 C:\cunzhi 添加到系统 PATH
-```
-
 ## 验证安装
 
 ```bash
 # 检查工具是否正确安装
-寸止 --help
+zhi --help
 等一下 --help
 ```
 
@@ -55,18 +57,23 @@ sudo cp 等一下 寸止 /usr/local/bin/
 ```json
 {
   "mcpServers": {
-    "寸止": {
-      "command": "寸止"
+    "cunzhi": {
+      "command": "zhi"
     }
   }
 }
 ```
 
+> 如果未加入 PATH，请使用绝对路径：
+> ```json
+> { "command": "C:/Users/<你的用户名>/AppData/Local/cunzhi/zhi.exe" }
+> ```
+
 ## 使用方法
 
 ### MCP 服务器模式
 ```bash
-寸止  # 启动 MCP 服务器
+zhi  # 启动 MCP 服务器
 ```
 
 ### 弹窗界面模式
@@ -77,7 +84,7 @@ sudo cp 等一下 寸止 /usr/local/bin/
 
 ## 工具说明
 
-- **寸止**: MCP 服务器，提供记忆管理和智能交互功能
+- **zhi**: MCP 服务器，提供记忆管理和智能交互功能
 - **等一下**: 弹窗界面，用于用户交互和设置
 
 ## 系统要求
@@ -91,7 +98,7 @@ sudo cp 等一下 寸止 /usr/local/bin/
 ### 权限问题
 ```bash
 # Linux/macOS
-chmod +x 等一下 寸止
+chmod +x zhi 等一下
 ```
 
 ### PATH 问题
@@ -115,7 +122,7 @@ pnpm build
 cargo build --release
 
 # 安装
-cp target/release/等一下 target/release/寸止 ~/.local/bin/
+cp target/release/zhi target/release/等一下 ~/.local/bin/
 ```
 
 ## 更新

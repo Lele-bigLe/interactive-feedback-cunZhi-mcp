@@ -29,8 +29,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: my_dev
           fetch-depth: 0
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Git
         run: |
@@ -97,7 +98,7 @@ jobs:
 
           echo "Updating version to $NEW_VERSION..."
 
-          # Update Cargo.toml (主要版本文件)
+          # Update Cargo.toml（主要版本文件）
           if [ -f "Cargo.toml" ]; then
             sed -i.bak "s/^version = \"[^\"]*\"/version = \"$NEW_VERSION\"/" Cargo.toml && rm Cargo.toml.bak
             echo "Updated Cargo.toml"
@@ -115,7 +116,7 @@ jobs:
             echo "Updated tauri.conf.json"
           fi
 
-          # Update version.json (如果存在)
+          # Update version.json（如果存在）
           if [ -f "version.json" ]; then
             sed -i.bak "s/\"version\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" version.json && rm version.json.bak
             sed -i.bak "s/\"build_date\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"build_date\": \"$CURRENT_DATE\"/" version.json && rm version.json.bak
@@ -133,8 +134,8 @@ jobs:
           # Create tag
           git tag -a "v$NEW_VERSION" -m "Release $NEW_VERSION"
 
-          # Push changes and tag
-          git push origin main
+          # Push changes and tag to my_dev branch
+          git push origin my_dev
           git push origin "v$NEW_VERSION"
 
           echo "✅ Released version v$NEW_VERSION"
