@@ -206,30 +206,42 @@ jobs:
       - name: Generate changelog and release title
         id: changelog
         run: |
+          PREVIOUS_TAG=""
+
           # 从 GitHub API 获取最新的 release 版本
           echo "Fetching latest release from GitHub API..."
           LATEST_RELEASE=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.tag_name // empty' 2>/dev/null || echo "")
 
-          if [ -z "$LATEST_RELEASE" ] || [ "$LATEST_RELEASE" = "null" ]; then
-            echo "GitHub API failed or no previous release found, falling back to git tags"
-            PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -2 | tail -1)
-            if [ -z "$PREVIOUS_TAG" ]; then
-              echo "No previous tags found, generating full changelog"
+          if [ -n "$LATEST_RELEASE" ] && [ "$LATEST_RELEASE" != "null" ]; then
+            # 验证该 tag 是否存在于 git 历史中
+            if git rev-parse "$LATEST_RELEASE" >/dev/null 2>&1; then
+              PREVIOUS_TAG="$LATEST_RELEASE"
+              echo "Found previous release in git: $PREVIOUS_TAG"
             else
-              echo "Found previous tag: $PREVIOUS_TAG"
+              echo "⚠️ GitHub API returned '$LATEST_RELEASE' but tag not found in git history, falling back..."
             fi
-          else
-            PREVIOUS_TAG="$LATEST_RELEASE"
-            echo "Found previous release: $PREVIOUS_TAG"
+          fi
+
+          # 如果 API 没找到或 tag 不存在，回退到本地 git tag
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "Falling back to local git tags..."
+            PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | grep -v "^${{ github.ref_name }}$" | head -1)
+            if [ -n "$PREVIOUS_TAG" ]; then
+              echo "Found previous tag in git: $PREVIOUS_TAG"
+            else
+              echo "No previous tags found, will generate full changelog"
+              PREVIOUS_TAG=""
+            fi
           fi
 
           echo "Current tag: ${{ github.ref_name }}"
-          echo "Previous version: $PREVIOUS_TAG"
+          echo "Previous version: ${PREVIOUS_TAG:-'(none)'}"
 
+          # 生成 changelog
           if [ -z "$PREVIOUS_TAG" ]; then
-            git-cliff --tag ${{ github.ref_name }} --output changelog.md
+            git-cliff --tag ${{ github.ref_name }} --output changelog.md || echo "## ${{ github.ref_name }}" > changelog.md
           else
-            git-cliff $PREVIOUS_TAG..${{ github.ref_name }} --output changelog.md
+            git-cliff $PREVIOUS_TAG..${{ github.ref_name }} --output changelog.md || echo "## ${{ github.ref_name }}" > changelog.md
 
             echo "" >> changelog.md
             echo "**Full Changelog**: [$PREVIOUS_TAG...${{ github.ref_name }}](https://github.com/${{ github.repository }}/compare/$PREVIOUS_TAG...${{ github.ref_name }})" >> changelog.md
@@ -245,7 +257,7 @@ jobs:
             COMMIT_RANGE="$PREVIOUS_TAG..${{ github.ref_name }}"
           fi
 
-          MAIN_FEATURE=$(git log --oneline $COMMIT_RANGE | grep -E "^[a-f0-9]+ (feat|fix)" | head -1 | sed 's/^[a-f0-9]* //' | sed 's/^feat: /✨ /' | sed 's/^fix: /🐞 /')
+          MAIN_FEATURE=$(git log --oneline $COMMIT_RANGE 2>/dev/null | grep -E "^[a-f0-9]+ (feat|fix)" | head -1 | sed 's/^[a-f0-9]* //' | sed 's/^feat: /✨ /' | sed 's/^fix: /🐞 /' || echo "")
 
           if [ -z "$MAIN_FEATURE" ]; then
             RELEASE_TITLE="$VERSION_NUMBER 📦 版本更新"
