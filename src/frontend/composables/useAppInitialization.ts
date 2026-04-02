@@ -67,8 +67,8 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
         }
       }
 
-      // 初始化MCP工具配置（在非MCP模式下）
-      if (!isMcp) {
+      // 初始化MCP工具配置（在非MCP模式下或守护进程模式下）
+      if (!isMcp || mcpHandler.isDaemonMode.value) {
         await initMcpTools()
         await setupMcpEventListener()
       }

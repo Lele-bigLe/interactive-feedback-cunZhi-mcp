@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { ref } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 /**
  * MCP处理组合式函数
@@ -8,15 +9,26 @@ import { ref } from 'vue'
 export function useMcpHandler() {
   const mcpRequest = ref(null)
   const showMcpPopup = ref(false)
+  const isDaemonMode = ref(false)
 
   /**
    * 统一的MCP响应处理
    */
   async function handleMcpResponse(response: any) {
     try {
-      // 通过Tauri命令发送响应并退出应用
+      // 通过Tauri命令发送响应
       await invoke('send_mcp_response', { response })
-      await invoke('exit_app')
+
+      if (isDaemonMode.value) {
+        // 守护进程模式：隐藏窗口，不退出
+        showMcpPopup.value = false
+        mcpRequest.value = null
+        await getCurrentWindow().hide()
+      }
+      else {
+        // 普通模式：退出应用
+        await invoke('exit_app')
+      }
     }
     catch (error) {
       console.error('MCP响应处理失败:', error)
@@ -28,9 +40,19 @@ export function useMcpHandler() {
    */
   async function handleMcpCancel() {
     try {
-      // 发送取消信息并退出应用
+      // 发送取消信息
       await invoke('send_mcp_response', { response: 'CANCELLED' })
-      await invoke('exit_app')
+
+      if (isDaemonMode.value) {
+        // 守护进程模式：隐藏窗口，不退出
+        showMcpPopup.value = false
+        mcpRequest.value = null
+        await getCurrentWindow().hide()
+      }
+      else {
+        // 普通模式：退出应用
+        await invoke('exit_app')
+      }
     }
     catch (error) {
       // 静默处理MCP取消错误
@@ -98,6 +120,12 @@ export function useMcpHandler() {
     try {
       const args = await invoke('get_cli_args')
 
+      // 检测守护进程模式
+      if (args && (args as any).daemon) {
+        isDaemonMode.value = true
+        console.log('🔄 守护进程模式已激活')
+      }
+
       if (args && (args as any).mcp_request) {
         // 读取MCP请求文件
         const content = await invoke('read_mcp_request', { filePath: (args as any).mcp_request })
@@ -131,6 +159,7 @@ export function useMcpHandler() {
   return {
     mcpRequest,
     showMcpPopup,
+    isDaemonMode,
     handleMcpResponse,
     handleMcpCancel,
     showMcpDialog,

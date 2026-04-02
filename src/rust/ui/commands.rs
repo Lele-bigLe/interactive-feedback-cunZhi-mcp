@@ -421,6 +421,14 @@ pub fn get_cli_args() -> Result<serde_json::Value, String> {
         );
     }
 
+    // 检查是否为守护进程模式
+    if crate::app::cli::is_daemon_mode() {
+        result.insert(
+            "daemon".to_string(),
+            serde_json::Value::Bool(true),
+        );
+    }
+
     Ok(serde_json::Value::Object(result))
 }
 

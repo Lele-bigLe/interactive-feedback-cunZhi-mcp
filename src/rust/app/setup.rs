@@ -1,6 +1,8 @@
 use crate::config::{AppState, load_config_and_apply_window_settings};
 use crate::ui::{initialize_audio_asset_manager, setup_window_event_listeners};
 use crate::ui::exit_handler::setup_exit_handlers;
+use crate::app::cli::is_daemon_mode;
+use crate::mcp::ipc::server::{start_ipc_server, cleanup_daemon};
 use crate::log_important;
 use tauri::{AppHandle, Manager};
 
@@ -13,6 +15,33 @@ pub async fn setup_application(app_handle: &AppHandle) -> Result<(), String> {
         log_important!(warn, "加载配置失败: {}", e);
     }
 
+    // 守护进程模式：隐藏主窗口，启动 IPC 服务端
+    if is_daemon_mode() {
+        if let Some(window) = app_handle.get_webview_window("main") {
+            let _ = window.hide();
+        }
+
+        let app_for_ipc = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = start_ipc_server(app_for_ipc).await {
+                log_important!(error, "IPC 服务端异常退出: {}", e);
+            }
+        });
+
+        // 注册退出时清理
+        if let Some(window) = app_handle.get_webview_window("main") {
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Destroyed = event {
+                    cleanup_daemon();
+                }
+            });
+        }
+
+        log_important!(info, "守护进程模式初始化完成");
+        return Ok(());
+    }
+
+    // 非守护进程模式：正常初始化
     // 初始化音频资源管理器
     if let Err(e) = initialize_audio_asset_manager(app_handle) {
         log_important!(warn, "初始化音频资源管理器失败: {}", e);

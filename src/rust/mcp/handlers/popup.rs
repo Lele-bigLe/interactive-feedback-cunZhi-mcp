@@ -108,6 +108,49 @@ fn build_runtime_popup_request(
 }
 
 fn launch_tauri_popup(request: &PopupRequest) -> Result<String> {
+    // 优先尝试 IPC 连接守护进程
+    match crate::mcp::ipc::client::send_popup_via_ipc(request) {
+        Ok(response) => return Ok(response),
+        Err(_) => {
+            // 守护进程不可用，尝试启动守护进程
+            if try_start_daemon() {
+                // 等待守护进程就绪，最多重试 5 次（每次 500ms）
+                for _ in 0..5 {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    if crate::mcp::ipc::client::is_daemon_alive() {
+                        // 守护进程已就绪，再次尝试 IPC
+                        match crate::mcp::ipc::client::send_popup_via_ipc(request) {
+                            Ok(response) => return Ok(response),
+                            Err(_) => continue,
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 最终回退：直接启动子进程（兼容旧流程）
+    launch_tauri_popup_direct(request)
+}
+
+/// 尝试启动守护进程（后台启动，不阻塞）
+fn try_start_daemon() -> bool {
+    let command_path = match find_ui_command() {
+        Ok(path) => path,
+        Err(_) => return false,
+    };
+
+    Command::new(&command_path)
+        .arg("--daemon")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .is_ok()
+}
+
+/// 直接启动子进程弹窗（回退方案）
+fn launch_tauri_popup_direct(request: &PopupRequest) -> Result<String> {
     let temp_dir = std::env::temp_dir();
     let temp_file = temp_dir.join(format!("mcp_request_{}.json", request.id));
     let request_json = serde_json::to_string_pretty(request)?;
@@ -373,10 +416,24 @@ fn is_timeout_response(response: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// 查找等一下 UI 命令的路径
+/// 查找等一下 UI 命令的路径（结果缓存，只查找一次）
 ///
 /// 按优先级查找：同目录 -> 全局版本 -> 开发环境
 fn find_ui_command() -> Result<String> {
+    use std::sync::OnceLock;
+    static CACHED_PATH: OnceLock<Result<String, String>> = OnceLock::new();
+
+    let result = CACHED_PATH.get_or_init(|| {
+        find_ui_command_inner().map_err(|e| e.to_string())
+    });
+
+    match result {
+        Ok(path) => Ok(path.clone()),
+        Err(e) => anyhow::bail!("{}", e),
+    }
+}
+
+fn find_ui_command_inner() -> Result<String> {
     if let Ok(current_exe) = std::env::current_exe() {
         if let Some(exe_dir) = current_exe.parent() {
             let local_ui_path = exe_dir.join("等一下");
