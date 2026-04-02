@@ -19,9 +19,14 @@ pub fn send_popup_via_ipc(request: &PopupRequest) -> Result<String> {
         anyhow::bail!("守护进程已退出（PID: {}）", state.pid);
     }
 
-    // 使用同步 runtime 发送请求（popup.rs 中是同步上下文）
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(send_ipc_request(state.port, request))
+    // 在独立线程创建 runtime，避免 "runtime within runtime" panic
+    let request = request.clone();
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(send_ipc_request(state.port, &request))
+    })
+    .join()
+    .map_err(|_| anyhow::anyhow!("IPC 线程执行失败"))?
 }
 
 /// 通过 IPC 发送关闭命令到守护进程
@@ -34,23 +39,27 @@ pub fn send_shutdown_via_ipc() -> Result<()> {
         return Ok(());
     }
 
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(async {
-        let mut stream = TcpStream::connect(format!("127.0.0.1:{}", state.port)).await?;
-        let request = IpcRequest::Shutdown;
-        let request_json = serde_json::to_string(&request)?;
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Runtime::new()?;
+        rt.block_on(async {
+            let mut stream = TcpStream::connect(format!("127.0.0.1:{}", state.port)).await?;
+            let request = IpcRequest::Shutdown;
+            let request_json = serde_json::to_string(&request)?;
 
-        stream.write_all(request_json.as_bytes()).await?;
-        stream.write_all(b"\n").await?;
-        stream.flush().await?;
+            stream.write_all(request_json.as_bytes()).await?;
+            stream.write_all(b"\n").await?;
+            stream.flush().await?;
 
-        // 等待确认
-        let mut buf_reader = BufReader::new(stream);
-        let mut line = String::new();
-        buf_reader.read_line(&mut line).await?;
+            // 等待确认
+            let mut buf_reader = BufReader::new(stream);
+            let mut line = String::new();
+            buf_reader.read_line(&mut line).await?;
 
-        Ok::<(), anyhow::Error>(())
+            Ok::<(), anyhow::Error>(())
+        })
     })
+    .join()
+    .map_err(|_| anyhow::anyhow!("IPC 线程执行失败"))?
 }
 
 /// 检查守护进程是否存活（ping）
@@ -65,19 +74,23 @@ pub fn is_daemon_alive() -> bool {
         return false;
     }
 
-    // 尝试 ping
-    let rt = match tokio::runtime::Runtime::new() {
-        Ok(rt) => rt,
-        Err(_) => return false,
-    };
+    // 在独立线程 ping，避免嵌套 runtime
+    std::thread::spawn(move || {
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(rt) => rt,
+            Err(_) => return false,
+        };
 
-    rt.block_on(async {
-        let result = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            ping_daemon(state.port),
-        ).await;
-        matches!(result, Ok(Ok(())))
+        rt.block_on(async {
+            let result = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                ping_daemon(state.port),
+            ).await;
+            matches!(result, Ok(Ok(())))
+        })
     })
+    .join()
+    .unwrap_or(false)
 }
 
 /// 发送弹窗请求
