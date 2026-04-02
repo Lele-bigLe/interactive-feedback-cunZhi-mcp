@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useFontManager } from './useFontManager'
 import { initMcpTools } from './useMcpTools'
 import { useSettings } from './useSettings'
@@ -86,6 +87,14 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
 
       // 结束初始化状态
       isInitializing.value = false
+
+      // 初始化完成后显示窗口，避免首次打开白屏闪烁
+      try {
+        await getCurrentWindow().show()
+      }
+      catch (e) {
+        console.warn('显示窗口失败:', e)
+      }
 
       return { isMcp, mcpContent }
     }

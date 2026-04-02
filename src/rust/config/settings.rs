@@ -84,6 +84,12 @@ pub struct WindowConfig {
     pub free_width: f64,
     #[serde(default = "default_free_height")]
     pub free_height: f64,
+
+    // 窗口位置记忆（None 表示居中）
+    #[serde(default)]
+    pub position_x: Option<i32>,
+    #[serde(default)]
+    pub position_y: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -302,6 +308,8 @@ pub fn default_window_config() -> WindowConfig {
         fixed_height: window::DEFAULT_HEIGHT,
         free_width: window::DEFAULT_WIDTH,
         free_height: window::DEFAULT_HEIGHT,
+        position_x: None,
+        position_y: None,
     }
 }
 

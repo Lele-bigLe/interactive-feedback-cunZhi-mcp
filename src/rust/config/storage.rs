@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, LogicalSize, Manager, State};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, State};
 
 use super::settings::{AppConfig, AppState, default_shortcuts};
 
@@ -113,6 +113,20 @@ pub async fn load_config_and_apply_window_settings(
         // 应用窗口大小（移除调试信息）
         if let Err(_e) = window.set_size(LogicalSize::new(target_width, target_height)) {
             // 静默处理窗口大小设置失败
+        }
+
+        // 恢复窗口位置（有记忆则恢复，否则居中）
+        if let (Some(x), Some(y)) = (window_config.position_x, window_config.position_y) {
+            if crate::constants::validation::is_valid_window_position(x, y) {
+                if let Err(e) = window.set_position(LogicalPosition::new(x as f64, y as f64)) {
+                    log::warn!("恢复窗口位置失败: {}, 回退居中", e);
+                    let _ = window.center();
+                }
+            } else {
+                let _ = window.center();
+            }
+        } else {
+            let _ = window.center();
         }
     }
 

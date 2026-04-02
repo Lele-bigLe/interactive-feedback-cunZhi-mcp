@@ -20,7 +20,7 @@
         "maxWidth": 600,
         "maxHeight": 1200,
         "center": true,
-        "visible": true,
+        "visible": false,
         "alwaysOnTop": true,
         "decorations": true,
         "hiddenTitle": true,
