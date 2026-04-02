@@ -148,6 +148,19 @@ fn is_process_alive(pid: u32) -> bool {
 
     #[cfg(unix)]
     {
-        unsafe { libc::kill(pid as i32, 0) == 0 }
+        // 通过 /proc/{pid} 检查进程是否存在（Linux），或 ps 命令（macOS）
+        #[cfg(target_os = "linux")]
+        {
+            std::path::Path::new(&format!("/proc/{}", pid)).exists()
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            use std::process::Command;
+            Command::new("ps")
+                .args(["-p", &pid.to_string()])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        }
     }
 }
