@@ -1,7 +1,7 @@
 use crate::config::{save_config, load_config, AppState, ReplyConfig, WindowConfig, CustomPrompt, CustomPromptConfig, ShortcutConfig, ShortcutBinding};
 use crate::constants::{window, ui, validation};
 use crate::mcp::types::{build_continue_response, build_send_response, ImageAttachment, PopupRequest};
-use crate::mcp::handlers::{create_tauri_popup, update_project_popup_timer_state};
+use crate::mcp::handlers::update_project_popup_timer_state;
 use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]
@@ -532,15 +532,17 @@ pub fn build_mcp_continue_response(
 
 /// 创建测试popup窗口
 #[tauri::command]
-pub async fn create_test_popup(request: serde_json::Value) -> Result<String, String> {
-    // 将JSON值转换为PopupRequest
-    let popup_request: PopupRequest = serde_json::from_value(request)
-        .map_err(|e| format!("解析请求参数失败: {}", e))?;
-
-    // 调用现有的popup创建函数
-    match create_tauri_popup(&popup_request) {
-        Ok(response) => Ok(response),
-        Err(e) => Err(format!("创建测试popup失败: {}", e))
+pub async fn create_test_popup(request: serde_json::Value, app: AppHandle) -> Result<String, String> {
+    // 测试弹窗直接通过 Tauri 事件触发前端弹窗（不走 IPC/子进程）
+    if let Some(window) = app.get_webview_window("main") {
+        use tauri::Emitter;
+        let _ = window.show();
+        let _ = window.set_focus();
+        window.emit("mcp-request", &request)
+            .map_err(|e| format!("发送弹窗事件失败: {}", e))?;
+        Ok("测试弹窗已通过事件触发".to_string())
+    } else {
+        Err("无法获取主窗口".to_string())
     }
 }
 
