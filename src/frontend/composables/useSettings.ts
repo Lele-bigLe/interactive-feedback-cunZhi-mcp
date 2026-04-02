@@ -391,16 +391,22 @@ function createSettings() {
 
   // 窗口焦点监听器
   let windowFocusUnlisten: (() => void) | null = null
+  let lastFocusReloadTime = 0
+  const FOCUS_RELOAD_THROTTLE_MS = 5000
 
   // 设置窗口焦点监听
   async function setupWindowFocusListener() {
     try {
       const webview = getCurrentWebviewWindow()
 
-      // 监听窗口获得焦点事件
+      // 监听窗口获得焦点事件（节流：5秒内不重复加载）
       windowFocusUnlisten = await webview.onFocusChanged(({ payload: focused }) => {
         if (focused) {
-          reloadAllSettings()
+          const now = Date.now()
+          if (now - lastFocusReloadTime > FOCUS_RELOAD_THROTTLE_MS) {
+            lastFocusReloadTime = now
+            reloadAllSettings()
+          }
         }
       })
     }

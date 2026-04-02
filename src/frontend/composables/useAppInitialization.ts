@@ -41,18 +41,14 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
 
       // 主题已在useTheme初始化时加载，这里不需要重复加载
 
-      // 加载字体设置
-      await Promise.all([
+      // 并行加载字体、窗口设置和检查 MCP 模式
+      const [,, { isMcp, mcpContent }] = await Promise.all([
         loadFontConfig(),
         loadFontOptions(),
+        checkMcpMode(),
+        settings.loadWindowSettings(),
+        settings.loadWindowConfig(),
       ])
-
-      // 检查是否为MCP模式
-      const { isMcp, mcpContent } = await checkMcpMode()
-
-      // 无论是否为MCP模式，都加载窗口设置
-      await settings.loadWindowSettings()
-      await settings.loadWindowConfig()
 
       // 设置窗口焦点监听器，用于配置同步
       await settings.setupWindowFocusListener()
@@ -88,12 +84,14 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
       // 结束初始化状态
       isInitializing.value = false
 
-      // 初始化完成后显示窗口，避免首次打开白屏闪烁
-      try {
-        await getCurrentWindow().show()
-      }
-      catch (e) {
-        console.warn('显示窗口失败:', e)
+      // 非守护进程模式下显示窗口；守护进程模式窗口由后端 IPC 控制显示
+      if (!mcpHandler.isDaemonMode.value) {
+        try {
+          await getCurrentWindow().show()
+        }
+        catch (e) {
+          console.warn('显示窗口失败:', e)
+        }
       }
 
       return { isMcp, mcpContent }

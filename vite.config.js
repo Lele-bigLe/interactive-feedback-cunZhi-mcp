@@ -29,6 +29,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['vue', '@vueuse/core'],
+          naiveui: ['naive-ui'],
           markdown: ['markdown-it', 'highlight.js'],
         },
       },

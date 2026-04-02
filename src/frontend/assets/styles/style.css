@@ -1,19 +1,19 @@
 /* 语义化 CSS 变量 - 由主题系统动态设置 */
 :root {
-  /* 使用中性的初始值，等待主题系统设置正确的值 */
-  --color-surface: #f5f5f5;
-  --color-surface-50: #f9f9f9;
-  --color-surface-100: #f0f0f0;
-  --color-surface-200: #e0e0e0;
-  --color-surface-300: #d0d0d0;
-  --color-surface-400: #a0a0a0;
+  /* 默认深色主题初始值，避免主题加载前闪白 */
+  --color-surface: #0a0a0a;
+  --color-surface-50: #111111;
+  --color-surface-100: #1a1a1a;
+  --color-surface-200: #2a2a2a;
+  --color-surface-300: #3a3a3a;
+  --color-surface-400: #505050;
   --color-surface-500: #808080;
-  --color-surface-600: #606060;
-  --color-surface-700: #404040;
-  --color-surface-800: #303030;
-  --color-surface-900: #202020;
-  --color-surface-950: #101010;
-  --color-on-surface: #333333;
+  --color-surface-600: #a0a0a0;
+  --color-surface-700: #c0c0c0;
+  --color-surface-800: #d0d0d0;
+  --color-surface-900: #e0e0e0;
+  --color-surface-950: #f0f0f0;
+  --color-on-surface: #e0e0e0;
 
   /* 字体变量 - 由字体管理器动态设置 */
   --font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -50,7 +50,7 @@
 }
 
 html {
-  background-color: var(--body-color, #f5f5f5);
+  background-color: var(--body-color, #000);
 }
 
 body {
@@ -59,8 +59,8 @@ body {
   font-family: var(--font-family-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--body-color, #f5f5f5);
-  color: var(--text-color, #333333);
+  background-color: var(--body-color, #000);
+  color: var(--text-color, #e0e0e0);
   min-height: 100vh;
 }
 

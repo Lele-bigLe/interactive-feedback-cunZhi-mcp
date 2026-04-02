@@ -171,7 +171,7 @@ function startCountdown() {
 
   countdownTimer = window.setInterval(() => {
     updateCountdown()
-  }, 250)
+  }, 1000)
 }
 
 function updateCountdown() {
@@ -212,7 +212,7 @@ async function resumeCountdown() {
   countdownDeadline.value = Date.now() + countdownRemainingMs.value
   countdownTimer = window.setInterval(() => {
     updateCountdown()
-  }, 250)
+  }, 1000)
   await syncTimerState(false, countdownRemainingMs.value)
 }
 
@@ -226,7 +226,7 @@ async function resetCountdown() {
   countdownDeadline.value = Date.now() + timeoutMs.value
   countdownTimer = window.setInterval(() => {
     updateCountdown()
-  }, 250)
+  }, 1000)
   await syncTimerState(false, timeoutMs.value)
 }
 

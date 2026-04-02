@@ -664,7 +664,7 @@ defineExpose({
           v-for="prompt in sortablePrompts"
           :key="prompt.id"
           :title="prompt.description || (prompt.content.trim() ? prompt.content : '清空输入框')"
-          class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-container-secondary hover:bg-container-tertiary rounded transition-all duration-200 select-none border border-gray-600 text-on-surface sortable-item"
+          class="inline-flex items-center gap-1 px-2 py-1 text-xs bg-container-secondary hover:bg-container-tertiary rounded transition-colors duration-200 select-none border border-gray-600 text-on-surface sortable-item"
         >
           <div class="drag-handle cursor-move p-0.5 rounded hover:bg-container-tertiary transition-colors">
             <div class="i-carbon-drag-horizontal w-3 h-3" />
@@ -731,7 +731,7 @@ defineExpose({
               width="100"
               height="100"
               object-fit="cover"
-              class="rounded-lg border-2 border-gray-300 hover:border-primary-400 transition-all duration-200 cursor-pointer"
+              class="rounded-lg border-2 border-gray-300 hover:border-primary-400 transition-colors duration-200 cursor-pointer"
             />
 
             <!-- 删除按钮 -->
