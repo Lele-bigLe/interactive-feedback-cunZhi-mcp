@@ -20,9 +20,10 @@ export function useMcpHandler() {
       await invoke('send_mcp_response', { response })
 
       if (isDaemonMode.value) {
-        // 守护进程模式：隐藏窗口，不退出
+        // 守护进程模式：保存窗口位置后隐藏窗口，不退出
         showMcpPopup.value = false
         mcpRequest.value = null
+        await invoke('save_window_position')
         await getCurrentWindow().hide()
       }
       else {
@@ -44,9 +45,10 @@ export function useMcpHandler() {
       await invoke('send_mcp_response', { response: 'CANCELLED' })
 
       if (isDaemonMode.value) {
-        // 守护进程模式：隐藏窗口，不退出
+        // 守护进程模式：保存窗口位置后隐藏窗口，不退出
         showMcpPopup.value = false
         mcpRequest.value = null
+        await invoke('save_window_position')
         await getCurrentWindow().hide()
       }
       else {

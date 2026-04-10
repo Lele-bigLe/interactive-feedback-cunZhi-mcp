@@ -78,6 +78,32 @@ pub async fn sync_window_state(
     Ok(())
 }
 
+/// 保存当前窗口位置到配置文件（守护进程模式下隐藏窗口前调用）
+#[tauri::command]
+pub async fn save_window_position(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        if let Ok(position) = window.outer_position() {
+            if crate::constants::validation::is_valid_window_position(position.x, position.y) {
+                let mut config = state
+                    .config
+                    .lock()
+                    .map_err(|e| format!("获取配置失败: {}", e))?;
+                config.ui_config.window_config.position_x = Some(position.x);
+                config.ui_config.window_config.position_y = Some(position.y);
+            }
+        }
+    }
+
+    save_config(&state, &app)
+        .await
+        .map_err(|e| format!("保存窗口位置失败: {}", e))?;
+
+    Ok(())
+}
+
 /// 重新加载配置文件到内存
 #[tauri::command]
 pub async fn reload_config(
