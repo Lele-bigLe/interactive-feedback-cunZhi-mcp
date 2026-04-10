@@ -2,19 +2,21 @@ use crate::config::AppState;
 use crate::log_important;
 use tauri::{AppHandle, Manager, WindowEvent};
 
+fn update_window_position(app_handle: &AppHandle, x: i32, y: i32) {
+    let state = app_handle.state::<AppState>();
+    if crate::constants::validation::is_valid_window_position(x, y) {
+        if let Ok(mut config) = state.config.lock() {
+            config.ui_config.window_config.position_x = Some(x);
+            config.ui_config.window_config.position_y = Some(y);
+        }
+    }
+}
+
 /// 保存当前窗口位置到配置
 fn save_window_position(app_handle: &AppHandle) {
     if let Some(window) = app_handle.get_webview_window("main") {
         if let Ok(position) = window.outer_position() {
-            let state = app_handle.state::<AppState>();
-            let x = position.x;
-            let y = position.y;
-            if crate::constants::validation::is_valid_window_position(x, y) {
-                if let Ok(mut config) = state.config.lock() {
-                    config.ui_config.window_config.position_x = Some(x);
-                    config.ui_config.window_config.position_y = Some(y);
-                };
-            }
+            update_window_position(app_handle, position.x, position.y);
         }
     }
 }
@@ -26,6 +28,9 @@ pub fn setup_window_event_listeners(app_handle: &AppHandle) {
 
         window.on_window_event(move |event| {
             match event {
+                WindowEvent::Moved(position) => {
+                    update_window_position(&app_handle_clone, position.x, position.y);
+                }
                 WindowEvent::CloseRequested { api, .. } => {
                     // 阻止默认的关闭行为
                     api.prevent_close();

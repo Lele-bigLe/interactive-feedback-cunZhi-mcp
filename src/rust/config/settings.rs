@@ -85,7 +85,7 @@ pub struct WindowConfig {
     #[serde(default = "default_free_height")]
     pub free_height: f64,
 
-    // 窗口位置记忆（None 表示居中）
+    // 窗口位置记忆（物理坐标，None 表示居中）
     #[serde(default)]
     pub position_x: Option<i32>,
     #[serde(default)]

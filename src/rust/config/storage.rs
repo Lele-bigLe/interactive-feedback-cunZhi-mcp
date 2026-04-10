@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, State};
+use tauri::{AppHandle, LogicalSize, Manager, PhysicalPosition, State, WebviewWindow};
 
 use super::settings::{default_shortcuts, AppConfig, AppState};
 
@@ -117,8 +117,10 @@ pub async fn load_config_and_apply_window_settings(
 
         // 恢复窗口位置（有记忆则恢复，否则居中）
         if let (Some(x), Some(y)) = (window_config.position_x, window_config.position_y) {
-            if crate::constants::validation::is_valid_window_position(x, y) {
-                if let Err(e) = window.set_position(LogicalPosition::new(x as f64, y as f64)) {
+            if let Some(position) =
+                resolve_window_position(&window, x, y, target_width, target_height)
+            {
+                if let Err(e) = window.set_position(position) {
                     log::warn!("恢复窗口位置失败: {}, 回退居中", e);
                     let _ = window.center();
                 }
@@ -131,6 +133,30 @@ pub async fn load_config_and_apply_window_settings(
     }
 
     Ok(())
+}
+
+fn resolve_window_position(
+    window: &WebviewWindow,
+    x: i32,
+    y: i32,
+    _width: f64,
+    _height: f64,
+) -> Option<PhysicalPosition<i32>> {
+    if !crate::constants::validation::is_valid_window_position(x, y) {
+        return None;
+    }
+
+    match window.monitor_from_point(x as f64, y as f64) {
+        Ok(Some(_)) => Some(PhysicalPosition::new(x, y)),
+        Ok(None) => {
+            log::warn!("记忆的窗口位置已超出当前显示器可见区域，回退居中");
+            None
+        }
+        Err(e) => {
+            log::warn!("获取显示器信息失败，按原位置恢复窗口: {}", e);
+            Some(PhysicalPosition::new(x, y))
+        }
+    }
 }
 
 /// 独立加载配置文件（用于MCP服务器等独立进程）
