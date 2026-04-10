@@ -40,6 +40,15 @@ struct ProjectPopupState {
     updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct RecentProjectRequestState {
+    request_id: String,
+    request_fingerprint: String,
+    project_path: String,
+    project_name: String,
+    recorded_at: DateTime<Utc>,
+}
+
 #[derive(Debug)]
 struct ProjectRuntimeLock {
     project_key: String,
@@ -57,6 +66,8 @@ impl Drop for ProjectRuntimeLock {
 ///
 /// 优先调用与 MCP 服务器同目录的 UI 命令，找不到时使用全局版本
 pub fn create_tauri_popup(request: &PopupRequest) -> Result<String> {
+    const RECENT_REQUEST_DEDUPE_WINDOW_MS: i64 = 30_000;
+
     let timeout_ms = if is_valid_popup_timeout(request.timeout_ms) {
         request.timeout_ms
     } else {
@@ -64,6 +75,16 @@ pub fn create_tauri_popup(request: &PopupRequest) -> Result<String> {
     };
     let project_scope = build_project_popup_scope(request.project_path.as_deref())?;
     let _runtime_lock = acquire_project_runtime_lock(project_scope.as_ref(), &request.id)?;
+    let request_fingerprint = hash_popup_request_fingerprint(request)?;
+    if let Some(scope) = project_scope.as_ref() {
+        ensure_recent_project_request_allowed(
+            scope,
+            &request.id,
+            &request_fingerprint,
+            RECENT_REQUEST_DEDUPE_WINDOW_MS,
+        )?;
+        record_recent_project_request(scope, &request.id, &request_fingerprint)?;
+    }
     let mut retry_count = 0;
 
     loop {
@@ -82,6 +103,11 @@ pub fn create_tauri_popup(request: &PopupRequest) -> Result<String> {
                 if is_timeout_response(&response) {
                     if retry_count >= MAX_RETRY_COUNT {
                         if let Some(scope) = project_scope.as_ref() {
+                            record_recent_project_request(
+                                scope,
+                                &request.id,
+                                &request_fingerprint,
+                            )?;
                             clear_project_popup_state(scope, &request.id)?;
                         }
                         return Ok("用户长时间未响应，寸止已停止自动重发".to_string());
@@ -92,12 +118,14 @@ pub fn create_tauri_popup(request: &PopupRequest) -> Result<String> {
                 }
 
                 if let Some(scope) = project_scope.as_ref() {
+                    record_recent_project_request(scope, &request.id, &request_fingerprint)?;
                     clear_project_popup_state(scope, &request.id)?;
                 }
                 return Ok(response);
             }
             Err(error) => {
                 if let Some(scope) = project_scope.as_ref() {
+                    record_recent_project_request(scope, &request.id, &request_fingerprint)?;
                     clear_project_popup_state(scope, &request.id)?;
                 }
                 return Err(error);
@@ -332,6 +360,16 @@ fn hash_project_path(project_path: &str) -> String {
     hex::encode(digest.as_ref())
 }
 
+fn hash_popup_request_fingerprint(request: &PopupRequest) -> Result<String> {
+    let request_signature = serde_json::json!({
+        "message": request.message,
+        "predefined_options": request.predefined_options,
+        "is_markdown": request.is_markdown,
+    });
+    let request_signature = serde_json::to_string(&request_signature)?;
+    Ok(hash_project_path(&request_signature))
+}
+
 fn build_project_request_conflict_error(state: &ProjectPopupState) -> anyhow::Error {
     if state.paused {
         return anyhow::anyhow!(
@@ -347,6 +385,58 @@ fn build_project_request_conflict_error(state: &ProjectPopupState) -> anyhow::Er
         state.project_name,
         remaining_seconds
     )
+}
+
+fn ensure_recent_project_request_allowed(
+    scope: &ProjectPopupScope,
+    current_request_id: &str,
+    current_request_fingerprint: &str,
+    dedupe_window_ms: i64,
+) -> Result<()> {
+    let Some(state) = read_recent_project_request_state(scope)? else {
+        return Ok(());
+    };
+
+    if state.request_id == current_request_id {
+        return Ok(());
+    }
+
+    if state.request_fingerprint != current_request_fingerprint {
+        return Ok(());
+    }
+
+    let dedupe_deadline = state.recorded_at + Duration::milliseconds(dedupe_window_ms);
+    if dedupe_deadline <= Utc::now() {
+        return Ok(());
+    }
+
+    let remaining_milliseconds = (dedupe_deadline - Utc::now()).num_milliseconds().max(1);
+    anyhow::bail!(
+        "当前项目 `{}` 的相同 cunzhi 请求刚刚已经触发，请在 {} 毫秒后再试。",
+        state.project_name,
+        remaining_milliseconds
+    );
+}
+
+fn record_recent_project_request(
+    scope: &ProjectPopupScope,
+    request_id: &str,
+    request_fingerprint: &str,
+) -> Result<()> {
+    let state = RecentProjectRequestState {
+        request_id: request_id.to_string(),
+        request_fingerprint: request_fingerprint.to_string(),
+        project_path: scope.project_path.clone(),
+        project_name: scope.project_name.clone(),
+        recorded_at: Utc::now(),
+    };
+
+    let state_file = recent_project_request_state_file(scope)?;
+    if let Some(parent) = state_file.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&state_file, serde_json::to_string_pretty(&state)?)?;
+    Ok(())
 }
 
 fn persist_project_popup_state(
@@ -434,6 +524,24 @@ fn read_project_popup_state(scope: &ProjectPopupScope) -> Result<Option<ProjectP
     }
 }
 
+fn read_recent_project_request_state(
+    scope: &ProjectPopupScope,
+) -> Result<Option<RecentProjectRequestState>> {
+    let state_file = recent_project_request_state_file(scope)?;
+    if !state_file.exists() {
+        return Ok(None);
+    }
+
+    let content = fs::read_to_string(&state_file)?;
+    match serde_json::from_str::<RecentProjectRequestState>(&content) {
+        Ok(state) => Ok(Some(state)),
+        Err(_) => {
+            let _ = fs::remove_file(&state_file);
+            Ok(None)
+        }
+    }
+}
+
 pub fn update_project_popup_timer_state(
     request: &PopupRequest,
     remaining_ms: u64,
@@ -489,6 +597,16 @@ fn project_popup_state_file(scope: &ProjectPopupScope) -> Result<PathBuf> {
         .join("cunzhi")
         .join("runtime")
         .join("zhi-project-state");
+
+    Ok(runtime_dir.join(format!("{}.json", scope.project_key)))
+}
+
+fn recent_project_request_state_file(scope: &ProjectPopupScope) -> Result<PathBuf> {
+    let runtime_dir = dirs::config_dir()
+        .ok_or_else(|| anyhow::anyhow!("无法获取配置目录"))?
+        .join("cunzhi")
+        .join("runtime")
+        .join("zhi-project-recent");
 
     Ok(runtime_dir.join(format!("{}.json", scope.project_key)))
 }

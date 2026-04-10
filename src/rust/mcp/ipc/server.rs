@@ -132,10 +132,14 @@ async fn handle_popup_request(
 
     // 等待前端响应（通过 response_channel）
     match rx.await {
-        Ok(response) => IpcResponse::PopupResponse { response },
-        Err(_) => IpcResponse::Error {
-            message: "等待用户响应超时或通道关闭".to_string(),
-        },
+        Ok(response) => {
+            IpcResponse::PopupResponse { response }
+        }
+        Err(_) => {
+            IpcResponse::Error {
+                message: "等待用户响应超时或通道关闭".to_string(),
+            }
+        }
     }
 }
 

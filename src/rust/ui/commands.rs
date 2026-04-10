@@ -725,11 +725,6 @@ pub async fn update_custom_prompt_order(
             .lock()
             .map_err(|e| format!("获取配置失败: {}", e))?;
 
-        log::debug!("更新前的prompt顺序:");
-        for prompt in &config.custom_prompt_config.prompts {
-            log::debug!("  {} (sort_order: {})", prompt.name, prompt.sort_order);
-        }
-
         // 根据新的顺序更新sort_order
         for (index, prompt_id) in prompt_ids.iter().enumerate() {
             if let Some(prompt) = config
@@ -738,15 +733,8 @@ pub async fn update_custom_prompt_order(
                 .iter_mut()
                 .find(|p| p.id == *prompt_id)
             {
-                let old_order = prompt.sort_order;
                 prompt.sort_order = (index + 1) as i32;
                 prompt.updated_at = chrono::Utc::now().to_rfc3339();
-                log::debug!(
-                    "更新prompt '{}': {} -> {}",
-                    prompt.name,
-                    old_order,
-                    prompt.sort_order
-                );
             }
         }
 
@@ -755,23 +743,12 @@ pub async fn update_custom_prompt_order(
             .custom_prompt_config
             .prompts
             .sort_by_key(|p| p.sort_order);
-
-        log::debug!("更新后的prompt顺序:");
-        for prompt in &config.custom_prompt_config.prompts {
-            log::debug!("  {} (sort_order: {})", prompt.name, prompt.sort_order);
-        }
     }
-
-    log::debug!("开始保存配置文件...");
-    let save_start = std::time::Instant::now();
 
     // 保存配置到文件
     save_config(&state, &app)
         .await
         .map_err(|e| format!("保存配置失败: {}", e))?;
-
-    let save_duration = save_start.elapsed();
-    log::debug!("配置保存完成，耗时: {:?}", save_duration);
 
     Ok(())
 }

@@ -86,7 +86,6 @@ export function useMcpHandler() {
       showMcpPopup.value = true
     }
     else {
-      console.log('🔕 跳过前端弹窗显示，仅使用Telegram交互')
     }
 
     // 播放音频通知（无论是否显示弹窗都播放）
@@ -105,7 +104,6 @@ export function useMcpHandler() {
           predefinedOptions: request.predefined_options || [],
           isMarkdown: request.is_markdown || false,
         })
-        console.log('✅ Telegram同步启动成功')
       }
     }
     catch (error) {
