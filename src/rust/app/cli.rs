@@ -1,8 +1,8 @@
-use crate::config::load_standalone_telegram_config;
-use crate::telegram::handle_telegram_only_mcp_request;
-use crate::mcp::ipc::client::send_shutdown_via_ipc;
-use crate::log_important;
 use crate::app::builder::run_tauri_app;
+use crate::config::load_standalone_telegram_config;
+use crate::log_important;
+use crate::mcp::ipc::client::send_shutdown_via_ipc;
+use crate::telegram::handle_telegram_only_mcp_request;
 use anyhow::Result;
 
 /// 全局标记：是否为守护进程模式
@@ -23,25 +23,23 @@ pub fn handle_cli_args() -> Result<()> {
             run_tauri_app();
         }
         // 单参数：帮助、版本、守护进程、关闭守护进程
-        2 => {
-            match args[1].as_str() {
-                "--help" | "-h" => print_help(),
-                "--version" | "-v" => print_version(),
-                "--daemon" => {
-                    DAEMON_MODE.store(true, std::sync::atomic::Ordering::Relaxed);
-                    log_important!(info, "以守护进程模式启动");
-                    run_tauri_app();
-                }
-                "--shutdown" => {
-                    handle_shutdown();
-                }
-                _ => {
-                    eprintln!("未知参数: {}", args[1]);
-                    print_help();
-                    std::process::exit(1);
-                }
+        2 => match args[1].as_str() {
+            "--help" | "-h" => print_help(),
+            "--version" | "-v" => print_version(),
+            "--daemon" => {
+                DAEMON_MODE.store(true, std::sync::atomic::Ordering::Relaxed);
+                log_important!(info, "以守护进程模式启动");
+                run_tauri_app();
             }
-        }
+            "--shutdown" => {
+                handle_shutdown();
+            }
+            _ => {
+                eprintln!("未知参数: {}", args[1]);
+                print_help();
+                std::process::exit(1);
+            }
+        },
         // 多参数：MCP请求模式
         _ => {
             if args[1] == "--mcp-request" && args.len() >= 3 {

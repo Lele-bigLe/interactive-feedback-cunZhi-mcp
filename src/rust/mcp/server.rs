@@ -1,16 +1,14 @@
 use anyhow::Result;
 use rmcp::{
-    Error as McpError, ServerHandler, ServiceExt, RoleServer,
-    model::*,
-    transport::stdio,
-    service::RequestContext,
+    model::*, service::RequestContext, transport::stdio, Error as McpError, RoleServer,
+    ServerHandler, ServiceExt,
 };
 use std::collections::HashMap;
 
-use super::tools::{InteractionTool, MemoryTool, AcemcpTool};
-use super::types::{ZhiRequest, JiyiRequest};
+use super::tools::{AcemcpTool, InteractionTool, MemoryTool};
+use super::types::{JiyiRequest, ZhiRequest};
 use crate::config::load_standalone_config;
-use crate::{log_important, log_debug};
+use crate::{log_debug, log_important};
 
 #[derive(Clone)]
 pub struct ZhiServer {
@@ -42,7 +40,12 @@ impl ZhiServer {
         // 每次都重新读取配置，确保获取最新状态
         match load_standalone_config() {
             Ok(config) => {
-                let enabled = config.mcp_config.tools.get(tool_name).copied().unwrap_or(true);
+                let enabled = config
+                    .mcp_config
+                    .tools
+                    .get(tool_name)
+                    .copied()
+                    .unwrap_or(true);
                 log_debug!("工具 {} 当前状态: {}", tool_name, enabled);
                 enabled
             }
@@ -81,8 +84,8 @@ impl ServerHandler for ZhiServer {
         _request: Option<PaginatedRequestParam>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, McpError> {
-        use std::sync::Arc;
         use std::borrow::Cow;
+        use std::sync::Arc;
 
         let mut tools = Vec::new();
 
@@ -114,7 +117,9 @@ impl ServerHandler for ZhiServer {
         if let serde_json::Value::Object(schema_map) = zhi_schema {
             tools.push(Tool {
                 name: Cow::Borrowed("zhi"),
-                description: Some(Cow::Borrowed("智能代码审查交互工具，支持预定义选项、自由文本输入和图片上传")),
+                description: Some(Cow::Borrowed(
+                    "智能代码审查交互工具，支持预定义选项、自由文本输入和图片上传",
+                )),
                 input_schema: Arc::new(schema_map),
                 annotations: None,
             });
@@ -148,7 +153,9 @@ impl ServerHandler for ZhiServer {
             if let serde_json::Value::Object(schema_map) = ji_schema {
                 tools.push(Tool {
                     name: Cow::Borrowed("ji"),
-                    description: Some(Cow::Borrowed("全局记忆管理工具，用于存储和管理重要的开发规范、用户偏好和最佳实践")),
+                    description: Some(Cow::Borrowed(
+                        "全局记忆管理工具，用于存储和管理重要的开发规范、用户偏好和最佳实践",
+                    )),
                     input_schema: Arc::new(schema_map),
                     annotations: None,
                 });
@@ -160,7 +167,10 @@ impl ServerHandler for ZhiServer {
             tools.push(AcemcpTool::get_tool_definition());
         }
 
-        log_debug!("返回给客户端的工具列表: {:?}", tools.iter().map(|t| &t.name).collect::<Vec<_>>());
+        log_debug!(
+            "返回给客户端的工具列表: {:?}",
+            tools.iter().map(|t| &t.name).collect::<Vec<_>>()
+        );
 
         Ok(ListToolsResult {
             tools,
@@ -178,7 +188,8 @@ impl ServerHandler for ZhiServer {
         match request.name.as_ref() {
             "zhi" => {
                 // 解析请求参数
-                let arguments_value = request.arguments
+                let arguments_value = request
+                    .arguments
                     .map(serde_json::Value::Object)
                     .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
@@ -193,12 +204,13 @@ impl ServerHandler for ZhiServer {
                 if !self.is_tool_enabled("ji") {
                     return Err(McpError::internal_error(
                         "记忆管理工具已被禁用".to_string(),
-                        None
+                        None,
                     ));
                 }
 
                 // 解析请求参数
-                let arguments_value = request.arguments
+                let arguments_value = request
+                    .arguments
                     .map(serde_json::Value::Object)
                     .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
@@ -213,43 +225,39 @@ impl ServerHandler for ZhiServer {
                 if !self.is_tool_enabled("sou") {
                     return Err(McpError::internal_error(
                         "代码搜索工具已被禁用".to_string(),
-                        None
+                        None,
                     ));
                 }
 
                 // 解析请求参数
-                let arguments_value = request.arguments
+                let arguments_value = request
+                    .arguments
                     .map(serde_json::Value::Object)
                     .unwrap_or(serde_json::Value::Object(serde_json::Map::new()));
 
                 // 使用acemcp模块中的AcemcpRequest类型
-                let acemcp_request: crate::mcp::tools::acemcp::types::AcemcpRequest = serde_json::from_value(arguments_value)
-                    .map_err(|e| McpError::invalid_params(format!("参数解析失败: {}", e), None))?;
+                let acemcp_request: crate::mcp::tools::acemcp::types::AcemcpRequest =
+                    serde_json::from_value(arguments_value).map_err(|e| {
+                        McpError::invalid_params(format!("参数解析失败: {}", e), None)
+                    })?;
 
                 // 调用代码搜索工具
                 AcemcpTool::search_context(acemcp_request).await
             }
-            _ => {
-                Err(McpError::invalid_request(
-                    format!("未知的工具: {}", request.name),
-                    None
-                ))
-            }
+            _ => Err(McpError::invalid_request(
+                format!("未知的工具: {}", request.name),
+                None,
+            )),
         }
     }
 }
 
-
-
 /// 启动MCP服务器
 pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {
     // 创建并运行服务器
-    let service = ZhiServer::new()
-        .serve(stdio())
-        .await
-        .inspect_err(|e| {
-            log_important!(error, "启动服务器失败: {}", e);
-        })?;
+    let service = ZhiServer::new().serve(stdio()).await.inspect_err(|e| {
+        log_important!(error, "启动服务器失败: {}", e);
+    })?;
 
     // 等待服务器关闭
     service.waiting().await?;

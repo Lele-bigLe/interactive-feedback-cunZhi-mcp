@@ -1,10 +1,10 @@
 use anyhow::Result;
-use rmcp::{Error as McpError, model::*};
+use rmcp::{model::*, Error as McpError};
 
-use crate::mcp::{ZhiRequest, PopupRequest};
+use crate::constants::mcp::REQUEST_TIMEOUT_MS;
 use crate::mcp::handlers::{create_tauri_popup, parse_mcp_response};
 use crate::mcp::utils::{generate_request_id, popup_error};
-use crate::constants::mcp::REQUEST_TIMEOUT_MS;
+use crate::mcp::{PopupRequest, ZhiRequest};
 
 /// 智能代码审查交互工具
 ///
@@ -13,9 +13,7 @@ use crate::constants::mcp::REQUEST_TIMEOUT_MS;
 pub struct InteractionTool;
 
 impl InteractionTool {
-    pub async fn zhi(
-        request: ZhiRequest,
-    ) -> Result<CallToolResult, McpError> {
+    pub async fn zhi(request: ZhiRequest) -> Result<CallToolResult, McpError> {
         let timeout_ms = crate::config::load_standalone_config()
             .map(|config| config.mcp_config.request_timeout_ms)
             .unwrap_or(REQUEST_TIMEOUT_MS);
@@ -41,9 +39,7 @@ impl InteractionTool {
                 let content = parse_mcp_response(&response)?;
                 Ok(CallToolResult::success(content))
             }
-            Err(e) => {
-                Err(popup_error(e.to_string()).into())
-            }
+            Err(e) => Err(popup_error(e.to_string()).into()),
         }
     }
 }

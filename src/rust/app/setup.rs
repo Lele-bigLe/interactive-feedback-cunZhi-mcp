@@ -1,9 +1,9 @@
-use crate::config::{AppState, load_config_and_apply_window_settings};
-use crate::ui::{initialize_audio_asset_manager, setup_window_event_listeners};
-use crate::ui::exit_handler::setup_exit_handlers;
 use crate::app::cli::is_daemon_mode;
-use crate::mcp::ipc::server::{start_ipc_server, cleanup_daemon};
+use crate::config::{load_config_and_apply_window_settings, AppState};
 use crate::log_important;
+use crate::mcp::ipc::server::{cleanup_daemon, start_ipc_server};
+use crate::ui::exit_handler::setup_exit_handlers;
+use crate::ui::{initialize_audio_asset_manager, setup_window_event_listeners};
 use tauri::{AppHandle, Manager};
 
 /// 应用设置和初始化

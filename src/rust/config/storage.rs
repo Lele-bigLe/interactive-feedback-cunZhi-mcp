@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, State};
 
-use super::settings::{AppConfig, AppState, default_shortcuts};
+use super::settings::{default_shortcuts, AppConfig, AppState};
 
 pub fn get_config_path(_app: &AppHandle) -> Result<PathBuf> {
     // 使用与独立配置相同的路径，确保一致性
@@ -178,7 +178,10 @@ fn merge_default_shortcuts(config: &mut AppConfig) {
     for (key, default_binding) in default_shortcuts {
         if !config.shortcut_config.shortcuts.contains_key(&key) {
             // 如果用户配置中不存在，则添加
-            config.shortcut_config.shortcuts.insert(key, default_binding);
+            config
+                .shortcut_config
+                .shortcuts
+                .insert(key, default_binding);
         } else if key == "enhance" {
             // 特殊处理：更新增强快捷键的默认值从 Shift+Enter 到 Ctrl+Shift+Enter
             let existing_binding = config.shortcut_config.shortcuts.get(&key).unwrap();
@@ -188,9 +191,13 @@ fn merge_default_shortcuts(config: &mut AppConfig) {
                 && !existing_binding.key_combination.ctrl
                 && existing_binding.key_combination.shift
                 && !existing_binding.key_combination.alt
-                && !existing_binding.key_combination.meta {
+                && !existing_binding.key_combination.meta
+            {
                 // 更新为新的默认值 (Ctrl+Shift+Enter)
-                config.shortcut_config.shortcuts.insert(key, default_binding);
+                config
+                    .shortcut_config
+                    .shortcuts
+                    .insert(key, default_binding);
             }
         }
     }

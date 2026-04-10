@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rmcp::{Error as McpError, model::Content};
+use rmcp::{model::Content, Error as McpError};
 
 use crate::mcp::types::{McpResponse, McpResponseContent};
 
@@ -39,7 +39,10 @@ pub fn parse_mcp_response(response: &str) -> Result<Vec<Content>, McpError> {
                                 image_count += 1;
 
                                 // 先添加图片到结果中（图片在前）
-                                result.push(Content::image(source.data.clone(), source.media_type.clone()));
+                                result.push(Content::image(
+                                    source.data.clone(),
+                                    source.media_type.clone(),
+                                ));
 
                                 // 添加图片信息到图片信息部分
                                 let base64_len = source.data.len();
@@ -123,7 +126,10 @@ fn parse_structured_response(response: McpResponse) -> Result<Vec<Content>, McpE
 
     // 1. 处理选择的选项
     if !response.selected_options.is_empty() {
-        text_parts.push(format!("选择的选项: {}", response.selected_options.join(", ")));
+        text_parts.push(format!(
+            "选择的选项: {}",
+            response.selected_options.join(", ")
+        ));
     }
 
     // 2. 处理用户输入文本
@@ -157,13 +163,20 @@ fn parse_structured_response(response: McpResponse) -> Result<Vec<Content>, McpE
             format!("{:.1} MB", estimated_size as f64 / (1024.0 * 1024.0))
         };
 
-        let filename_info = image.filename.as_ref()
+        let filename_info = image
+            .filename
+            .as_ref()
             .map(|f| format!("\n文件名: {}", f))
             .unwrap_or_default();
 
         let image_info = format!(
             "=== 图片 {} ==={}\n类型: {}\n大小: {}\nBase64 预览: {}\n完整 Base64 长度: {} 字符",
-            index + 1, filename_info, image.media_type, size_str, preview, base64_len
+            index + 1,
+            filename_info,
+            image.media_type,
+            size_str,
+            preview,
+            base64_len
         );
         image_info_parts.push(image_info);
     }

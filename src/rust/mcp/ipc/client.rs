@@ -2,7 +2,7 @@ use anyhow::Result;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 
-use super::types::{IpcRequest, IpcResponse, read_daemon_state};
+use super::types::{read_daemon_state, IpcRequest, IpcResponse};
 use crate::mcp::types::PopupRequest;
 
 /// 通过 IPC 发送弹窗请求到守护进程
@@ -10,8 +10,7 @@ use crate::mcp::types::PopupRequest;
 /// 成功返回响应字符串，失败返回错误（调用方可回退到直接启动进程）
 pub fn send_popup_via_ipc(request: &PopupRequest) -> Result<String> {
     // 读取守护进程状态
-    let state = read_daemon_state()?
-        .ok_or_else(|| anyhow::anyhow!("守护进程未运行"))?;
+    let state = read_daemon_state()?.ok_or_else(|| anyhow::anyhow!("守护进程未运行"))?;
 
     // 检查守护进程是否存活
     if !is_process_alive(state.pid) {
@@ -31,8 +30,7 @@ pub fn send_popup_via_ipc(request: &PopupRequest) -> Result<String> {
 
 /// 通过 IPC 发送关闭命令到守护进程
 pub fn send_shutdown_via_ipc() -> Result<()> {
-    let state = read_daemon_state()?
-        .ok_or_else(|| anyhow::anyhow!("守护进程未运行"))?;
+    let state = read_daemon_state()?.ok_or_else(|| anyhow::anyhow!("守护进程未运行"))?;
 
     if !is_process_alive(state.pid) {
         super::types::clear_daemon_state()?;
@@ -82,10 +80,9 @@ pub fn is_daemon_alive() -> bool {
         };
 
         rt.block_on(async {
-            let result = tokio::time::timeout(
-                std::time::Duration::from_secs(2),
-                ping_daemon(state.port),
-            ).await;
+            let result =
+                tokio::time::timeout(std::time::Duration::from_secs(2), ping_daemon(state.port))
+                    .await;
             matches!(result, Ok(Ok(())))
         })
     })

@@ -1,9 +1,9 @@
 use anyhow::Result;
+use tauri::{AppHandle, Emitter, Listener, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
-use tauri::{AppHandle, Manager, Emitter, Listener};
 
-use super::types::{IpcRequest, IpcResponse, write_daemon_state, clear_daemon_state};
+use super::types::{clear_daemon_state, write_daemon_state, IpcRequest, IpcResponse};
 use crate::config::AppState;
 use crate::log_important;
 
@@ -43,10 +43,7 @@ pub async fn start_ipc_server(app_handle: AppHandle) -> Result<()> {
 }
 
 /// 处理单个 IPC 连接
-async fn handle_ipc_connection(
-    stream: tokio::net::TcpStream,
-    app: AppHandle,
-) -> Result<()> {
+async fn handle_ipc_connection(stream: tokio::net::TcpStream, app: AppHandle) -> Result<()> {
     let (reader, mut writer) = stream.into_split();
     let mut buf_reader = BufReader::new(reader);
     let mut line = String::new();
@@ -58,8 +55,8 @@ async fn handle_ipc_connection(
         return Ok(());
     }
 
-    let request: IpcRequest = serde_json::from_str(line)
-        .map_err(|e| anyhow::anyhow!("解析 IPC 请求失败: {}", e))?;
+    let request: IpcRequest =
+        serde_json::from_str(line).map_err(|e| anyhow::anyhow!("解析 IPC 请求失败: {}", e))?;
 
     let response = match request {
         IpcRequest::Ping => IpcResponse::Pong,
@@ -78,9 +75,7 @@ async fn handle_ipc_connection(
             return Ok(());
         }
 
-        IpcRequest::Popup { request } => {
-            handle_popup_request(&app, request).await
-        }
+        IpcRequest::Popup { request } => handle_popup_request(&app, request).await,
     };
 
     let resp_json = serde_json::to_string(&response)?;

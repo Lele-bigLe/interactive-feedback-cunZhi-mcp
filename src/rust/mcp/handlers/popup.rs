@@ -2,9 +2,12 @@ use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use ring::digest::{Context as ShaContext, SHA256};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::{Mutex, OnceLock};
 
 use crate::constants::{
     mcp::{MAX_RETRY_COUNT, REQUEST_TIMEOUT_MS},
@@ -37,6 +40,19 @@ struct ProjectPopupState {
     updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug)]
+struct ProjectRuntimeLock {
+    project_key: String,
+}
+
+impl Drop for ProjectRuntimeLock {
+    fn drop(&mut self) {
+        if let Ok(mut active_projects) = active_project_popup_keys().lock() {
+            active_projects.remove(&self.project_key);
+        }
+    }
+}
+
 /// 创建 Tauri 弹窗
 ///
 /// 优先调用与 MCP 服务器同目录的 UI 命令，找不到时使用全局版本
@@ -47,17 +63,18 @@ pub fn create_tauri_popup(request: &PopupRequest) -> Result<String> {
         REQUEST_TIMEOUT_MS
     };
     let project_scope = build_project_popup_scope(request.project_path.as_deref())?;
+    let _runtime_lock = acquire_project_runtime_lock(project_scope.as_ref(), &request.id)?;
     let mut retry_count = 0;
 
     loop {
         let expires_at = Utc::now() + Duration::milliseconds(timeout_ms as i64);
 
         if let Some(scope) = project_scope.as_ref() {
-            ensure_project_request_available(scope, &request.id)?;
             persist_project_popup_state(scope, &request.id, timeout_ms, retry_count, expires_at)?;
         }
 
-        let popup_request = build_runtime_popup_request(request, project_scope.as_ref(), timeout_ms, retry_count);
+        let popup_request =
+            build_runtime_popup_request(request, project_scope.as_ref(), timeout_ms, retry_count);
         let popup_response = launch_tauri_popup(&popup_request);
 
         match popup_response {
@@ -87,6 +104,45 @@ pub fn create_tauri_popup(request: &PopupRequest) -> Result<String> {
             }
         }
     }
+}
+
+fn active_project_popup_keys() -> &'static Mutex<HashSet<String>> {
+    static ACTIVE_PROJECTS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    ACTIVE_PROJECTS.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn acquire_project_runtime_lock(
+    project_scope: Option<&ProjectPopupScope>,
+    current_request_id: &str,
+) -> Result<Option<ProjectRuntimeLock>> {
+    let Some(scope) = project_scope else {
+        return Ok(None);
+    };
+
+    let mut active_projects = active_project_popup_keys()
+        .lock()
+        .map_err(|error| anyhow::anyhow!("获取项目锁失败: {}", error))?;
+
+    if active_projects.contains(&scope.project_key) {
+        drop(active_projects);
+
+        if let Some(state) = read_project_popup_state(scope)? {
+            if state.request_id != current_request_id {
+                return Err(build_project_request_conflict_error(&state));
+            }
+        }
+
+        anyhow::bail!(
+            "当前项目 `{}` 已有正在创建中的 cunzhi 请求，请勿重复发起。",
+            scope.project_name
+        );
+    }
+
+    active_projects.insert(scope.project_key.clone());
+
+    Ok(Some(ProjectRuntimeLock {
+        project_key: scope.project_key.clone(),
+    }))
 }
 
 fn build_runtime_popup_request(
@@ -276,34 +332,21 @@ fn hash_project_path(project_path: &str) -> String {
     hex::encode(digest.as_ref())
 }
 
-fn ensure_project_request_available(scope: &ProjectPopupScope, current_request_id: &str) -> Result<()> {
-    let Some(state) = read_project_popup_state(scope)? else {
-        return Ok(());
-    };
-
-    if state.request_id == current_request_id {
-        return Ok(());
-    }
-
-    let now = Utc::now();
+fn build_project_request_conflict_error(state: &ProjectPopupState) -> anyhow::Error {
     if state.paused {
-        anyhow::bail!(
+        return anyhow::anyhow!(
             "当前项目 `{}` 的 cunzhi 请求计时已暂停，请勿重复发起。",
             state.project_name
         );
     }
 
-    if state.expires_at <= now {
-        clear_project_popup_state(scope, &state.request_id)?;
-        return Ok(());
-    }
-
+    let now = Utc::now();
     let remaining_seconds = (state.expires_at - now).num_seconds().max(1);
-    anyhow::bail!(
+    anyhow::anyhow!(
         "当前项目 `{}` 已有未过期的寸止请求，剩余 {} 秒，请勿重复发起。",
         state.project_name,
         remaining_seconds
-    );
+    )
 }
 
 fn persist_project_popup_state(
@@ -329,8 +372,50 @@ fn persist_project_popup_state(
     if let Some(parent) = state_file.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(state_file, serde_json::to_string_pretty(&state)?)?;
-    Ok(())
+
+    let state_json = serde_json::to_string_pretty(&state)?;
+
+    for _ in 0..3 {
+        if try_create_project_popup_state_file(&state_file, &state_json)? {
+            return Ok(());
+        }
+
+        let Some(existing_state) = read_project_popup_state(scope)? else {
+            continue;
+        };
+
+        if existing_state.request_id == request_id {
+            fs::write(&state_file, &state_json)?;
+            return Ok(());
+        }
+
+        if existing_state.paused || existing_state.expires_at > Utc::now() {
+            return Err(build_project_request_conflict_error(&existing_state));
+        }
+
+        clear_project_popup_state(scope, &existing_state.request_id)?;
+    }
+
+    anyhow::bail!(
+        "当前项目 `{}` 的 cunzhi 请求状态写入失败，请稍后重试。",
+        scope.project_name
+    )
+}
+
+fn try_create_project_popup_state_file(state_file: &Path, state_json: &str) -> Result<bool> {
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(state_file)
+    {
+        Ok(mut file) => {
+            file.write_all(state_json.as_bytes())?;
+            file.flush()?;
+            Ok(true)
+        }
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(false),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn read_project_popup_state(scope: &ProjectPopupScope) -> Result<Option<ProjectPopupState>> {
@@ -423,9 +508,7 @@ fn find_ui_command() -> Result<String> {
     use std::sync::OnceLock;
     static CACHED_PATH: OnceLock<Result<String, String>> = OnceLock::new();
 
-    let result = CACHED_PATH.get_or_init(|| {
-        find_ui_command_inner().map_err(|e| e.to_string())
-    });
+    let result = CACHED_PATH.get_or_init(|| find_ui_command_inner().map_err(|e| e.to_string()));
 
     match result {
         Ok(path) => Ok(path.clone()),

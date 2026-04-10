@@ -11,7 +11,9 @@ pub struct ZhiRequest {
     #[schemars(description = "消息是否为Markdown格式，默认为true")]
     #[serde(default = "default_is_markdown")]
     pub is_markdown: bool,
-    #[schemars(description = "项目路径（可选，建议传入 git 根目录绝对路径，用于同项目防重复和超时重发）")]
+    #[schemars(
+        description = "项目路径（可选，建议传入 git 根目录绝对路径，用于同项目防重复和超时重发）"
+    )]
     #[serde(default)]
     pub project_path: Option<String>,
 }

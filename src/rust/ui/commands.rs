@@ -1,7 +1,12 @@
-use crate::config::{save_config, load_config, AppState, ReplyConfig, WindowConfig, CustomPrompt, CustomPromptConfig, ShortcutConfig, ShortcutBinding};
-use crate::constants::{window, ui, validation};
-use crate::mcp::types::{build_continue_response, build_send_response, ImageAttachment, PopupRequest};
+use crate::config::{
+    load_config, save_config, AppState, CustomPrompt, CustomPromptConfig, ReplyConfig,
+    ShortcutBinding, ShortcutConfig, WindowConfig,
+};
+use crate::constants::{ui, validation, window};
 use crate::mcp::handlers::update_project_popup_timer_state;
+use crate::mcp::types::{
+    build_continue_response, build_send_response, ImageAttachment, PopupRequest,
+};
 use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]
@@ -278,12 +283,19 @@ pub async fn get_current_window_size(app: tauri::AppHandle) -> Result<serde_json
             let height = logical_size.height.round() as u32;
 
             // 验证并调整尺寸到有效范围
-            let (clamped_width, clamped_height) = crate::constants::window::clamp_window_size(width as f64, height as f64);
+            let (clamped_width, clamped_height) =
+                crate::constants::window::clamp_window_size(width as f64, height as f64);
             let final_width = clamped_width as u32;
             let final_height = clamped_height as u32;
 
             if final_width != width || final_height != height {
-                log::info!("窗口尺寸已调整: {}x{} -> {}x{}", width, height, final_width, final_height);
+                log::info!(
+                    "窗口尺寸已调整: {}x{} -> {}x{}",
+                    width,
+                    height,
+                    final_width,
+                    final_height
+                );
             }
 
             let window_size = serde_json::json!({
@@ -423,10 +435,7 @@ pub fn get_cli_args() -> Result<serde_json::Value, String> {
 
     // 检查是否为守护进程模式
     if crate::app::cli::is_daemon_mode() {
-        result.insert(
-            "daemon".to_string(),
-            serde_json::Value::Bool(true),
-        );
+        result.insert("daemon".to_string(), serde_json::Value::Bool(true));
     }
 
     Ok(serde_json::Value::Object(result))
@@ -469,23 +478,17 @@ pub async fn open_external_url(url: String) -> Result<(), String> {
 
     // 根据操作系统选择合适的命令
     let result = if cfg!(target_os = "windows") {
-        Command::new("cmd")
-            .args(["/C", "start", &url])
-            .spawn()
+        Command::new("cmd").args(["/C", "start", &url]).spawn()
     } else if cfg!(target_os = "macos") {
-        Command::new("open")
-            .arg(&url)
-            .spawn()
+        Command::new("open").arg(&url).spawn()
     } else {
         // Linux 和其他 Unix 系统
-        Command::new("xdg-open")
-            .arg(&url)
-            .spawn()
+        Command::new("xdg-open").arg(&url).spawn()
     };
 
     match result {
         Ok(_) => Ok(()),
-        Err(e) => Err(format!("无法打开链接: {}", e))
+        Err(e) => Err(format!("无法打开链接: {}", e)),
     }
 }
 
@@ -494,8 +497,6 @@ pub async fn exit_app(app: AppHandle) -> Result<(), String> {
     // 直接调用强制退出，用于程序内部的退出操作（如MCP响应后退出）
     crate::ui::exit::force_exit_app(app).await
 }
-
-
 
 /// 处理应用退出请求（用于前端退出快捷键）
 #[tauri::command]
@@ -532,13 +533,17 @@ pub fn build_mcp_continue_response(
 
 /// 创建测试popup窗口
 #[tauri::command]
-pub async fn create_test_popup(request: serde_json::Value, app: AppHandle) -> Result<String, String> {
+pub async fn create_test_popup(
+    request: serde_json::Value,
+    app: AppHandle,
+) -> Result<String, String> {
     // 测试弹窗直接通过 Tauri 事件触发前端弹窗（不走 IPC/子进程）
     if let Some(window) = app.get_webview_window("main") {
         use tauri::Emitter;
         let _ = window.show();
         let _ = window.set_focus();
-        window.emit("mcp-request", &request)
+        window
+            .emit("mcp-request", &request)
             .map_err(|e| format!("发送弹窗事件失败: {}", e))?;
         Ok("测试弹窗已通过事件触发".to_string())
     } else {
@@ -561,7 +566,9 @@ pub fn sync_popup_timer_state(
 
 /// 获取自定义prompt配置
 #[tauri::command]
-pub async fn get_custom_prompt_config(state: State<'_, AppState>) -> Result<CustomPromptConfig, String> {
+pub async fn get_custom_prompt_config(
+    state: State<'_, AppState>,
+) -> Result<CustomPromptConfig, String> {
     let config = state
         .config
         .lock()
@@ -583,12 +590,22 @@ pub async fn add_custom_prompt(
             .map_err(|e| format!("获取配置失败: {}", e))?;
 
         // 检查是否超过最大数量限制
-        if config.custom_prompt_config.prompts.len() >= config.custom_prompt_config.max_prompts as usize {
-            return Err(format!("自定义prompt数量已达到上限: {}", config.custom_prompt_config.max_prompts));
+        if config.custom_prompt_config.prompts.len()
+            >= config.custom_prompt_config.max_prompts as usize
+        {
+            return Err(format!(
+                "自定义prompt数量已达到上限: {}",
+                config.custom_prompt_config.max_prompts
+            ));
         }
 
         // 检查ID是否已存在
-        if config.custom_prompt_config.prompts.iter().any(|p| p.id == prompt.id) {
+        if config
+            .custom_prompt_config
+            .prompts
+            .iter()
+            .any(|p| p.id == prompt.id)
+        {
             return Err("prompt ID已存在".to_string());
         }
 
@@ -617,7 +634,12 @@ pub async fn update_custom_prompt(
             .map_err(|e| format!("获取配置失败: {}", e))?;
 
         // 查找并更新prompt
-        if let Some(existing_prompt) = config.custom_prompt_config.prompts.iter_mut().find(|p| p.id == prompt.id) {
+        if let Some(existing_prompt) = config
+            .custom_prompt_config
+            .prompts
+            .iter_mut()
+            .find(|p| p.id == prompt.id)
+        {
             *existing_prompt = prompt;
         } else {
             return Err("未找到指定的prompt".to_string());
@@ -647,7 +669,10 @@ pub async fn delete_custom_prompt(
 
         // 查找并删除prompt
         let initial_len = config.custom_prompt_config.prompts.len();
-        config.custom_prompt_config.prompts.retain(|p| p.id != prompt_id);
+        config
+            .custom_prompt_config
+            .prompts
+            .retain(|p| p.id != prompt_id);
 
         if config.custom_prompt_config.prompts.len() == initial_len {
             return Err("未找到指定的prompt".to_string());
@@ -707,16 +732,29 @@ pub async fn update_custom_prompt_order(
 
         // 根据新的顺序更新sort_order
         for (index, prompt_id) in prompt_ids.iter().enumerate() {
-            if let Some(prompt) = config.custom_prompt_config.prompts.iter_mut().find(|p| p.id == *prompt_id) {
+            if let Some(prompt) = config
+                .custom_prompt_config
+                .prompts
+                .iter_mut()
+                .find(|p| p.id == *prompt_id)
+            {
                 let old_order = prompt.sort_order;
                 prompt.sort_order = (index + 1) as i32;
                 prompt.updated_at = chrono::Utc::now().to_rfc3339();
-                log::debug!("更新prompt '{}': {} -> {}", prompt.name, old_order, prompt.sort_order);
+                log::debug!(
+                    "更新prompt '{}': {} -> {}",
+                    prompt.name,
+                    old_order,
+                    prompt.sort_order
+                );
             }
         }
 
         // 按sort_order排序
-        config.custom_prompt_config.prompts.sort_by_key(|p| p.sort_order);
+        config
+            .custom_prompt_config
+            .prompts
+            .sort_by_key(|p| p.sort_order);
 
         log::debug!("更新后的prompt顺序:");
         for prompt in &config.custom_prompt_config.prompts {
@@ -753,7 +791,12 @@ pub async fn update_conditional_prompt_state(
             .map_err(|e| format!("获取配置失败: {}", e))?;
 
         // 查找并更新指定prompt的current_state
-        if let Some(prompt) = config.custom_prompt_config.prompts.iter_mut().find(|p| p.id == prompt_id) {
+        if let Some(prompt) = config
+            .custom_prompt_config
+            .prompts
+            .iter_mut()
+            .find(|p| p.id == prompt_id)
+        {
             prompt.current_state = new_state;
             prompt.updated_at = chrono::Utc::now().to_rfc3339();
         } else {
@@ -769,15 +812,11 @@ pub async fn update_conditional_prompt_state(
     Ok(())
 }
 
-
-
-
-
 /// 获取配置文件的真实路径
 #[tauri::command]
 pub async fn get_config_file_path(app: AppHandle) -> Result<String, String> {
-    let config_path = crate::config::get_config_path(&app)
-        .map_err(|e| format!("获取配置文件路径失败: {}", e))?;
+    let config_path =
+        crate::config::get_config_path(&app).map_err(|e| format!("获取配置文件路径失败: {}", e))?;
 
     // 获取绝对路径
     let absolute_path = if config_path.is_absolute() {
@@ -845,7 +884,13 @@ fn normalize_path_display(path: &std::path::Path) -> String {
         path_str.to_string()
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux", target_os = "ios", target_os = "android")))]
+    #[cfg(not(any(
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "ios",
+        target_os = "android"
+    )))]
     {
         // 其他平台: 通用处理
         path_str.to_string()
@@ -879,7 +924,10 @@ pub async fn update_shortcut_binding(
             .map_err(|e| format!("获取配置失败: {}", e))?;
 
         // 更新指定的快捷键绑定
-        config.shortcut_config.shortcuts.insert(shortcut_id, binding);
+        config
+            .shortcut_config
+            .shortcuts
+            .insert(shortcut_id, binding);
     }
 
     // 保存配置到文件
@@ -889,8 +937,6 @@ pub async fn update_shortcut_binding(
 
     Ok(())
 }
-
-
 
 /// 重置快捷键为默认值
 #[tauri::command]
