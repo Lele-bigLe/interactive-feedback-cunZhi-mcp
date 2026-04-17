@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import IntroTab from '../tabs/IntroTab.vue'
 import McpToolsTab from '../tabs/McpToolsTab.vue'
 import PromptsTab from '../tabs/PromptsTab.vue'
 import SettingsTab from '../tabs/SettingsTab.vue'
@@ -35,63 +34,37 @@ function handleConfigReloaded() {
   emit('configReloaded')
 }
 
-const activeTab = ref('intro')
-
-// 图标加载错误处理
-function handleImageError(event: Event) {
-  const img = event.target as HTMLImageElement
-  // 如果图标加载失败，隐藏图片元素
-  img.style.display = 'none'
-  console.warn('LOGO图标加载失败，已隐藏')
-}
+const activeTab = ref('mcp-tools')
 </script>
 
 <template>
   <div class="flex flex-col min-h-screen">
     <!-- 主要内容区域 -->
-    <div class="flex-1 flex items-start justify-center p-6 pt-12">
+    <div class="flex-1 flex items-start justify-center p-6 pt-6">
       <div class="max-w-6xl w-full">
         <!-- 标题区域 -->
-        <div class="text-center mb-8">
-          <!-- 主标题 -->
-          <div class="flex items-center justify-center gap-4 mb-3" data-guide="app-logo">
-            <img
-              src="/icons/icon-128.png"
-              alt="cunzhi Logo"
-              class="w-10 h-10 rounded-xl shadow-lg"
-              @error="handleImageError"
-            >
-            <div class="text-left">
-              <div class="app-panel-title text-4xl font-semibold text-white leading-none">
-                寸止
-              </div>
-              <div class="app-panel-caption mt-2 text-sm text-white/55 uppercase tracking-[0.22em]">
-                CUNZHI INTERACTION PANEL
+        <div class="mb-5 px-1">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3 min-w-0" data-guide="app-logo">
+              <div class="w-3 h-3 rounded-full bg-primary-500 flex-shrink-0" />
+              <div class="min-w-0">
+                <div class="app-panel-title text-xl font-semibold text-on-surface leading-tight">
+                  cunzhi
+                </div>
+                <div class="app-panel-caption mt-1 text-xs text-on-surface-secondary uppercase tracking-[0.22em]">
+                  CUNZHI INTERACTION PANEL
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- 服务器状态 -->
-          <div class="mb-4">
-            <n-tag type="success" size="small" round class="px-3 py-1">
-              <template #icon>
-                <div class="w-2 h-2 bg-success rounded-full animate-pulse" />
-              </template>
+            <div class="text-xs text-on-surface-secondary whitespace-nowrap pl-6 sm:pl-0">
               MCP 服务已启动
-            </n-tag>
+            </div>
           </div>
-
-          <!-- 副标题 -->
-          <p class="text-base opacity-50 font-normal text-white app-panel-title">
-            项目级 AI 交互面板，减少流程中断与状态丢失
-          </p>
         </div>
 
         <!-- Tab组件 -->
-        <n-tabs v-model:value="activeTab" type="segment" size="small" justify-content="center" data-guide="tabs">
-          <n-tab-pane name="intro" tab="介绍">
-            <IntroTab v-if="activeTab === 'intro'" />
-          </n-tab-pane>
+        <n-tabs v-model:value="activeTab" class="main-layout-tabs" type="segment" size="small" justify-content="center" data-guide="tabs">
           <n-tab-pane name="mcp-tools" tab="MCP 工具">
             <McpToolsTab v-if="activeTab === 'mcp-tools'" />
           </n-tab-pane>
@@ -124,3 +97,14 @@ function handleImageError(event: Event) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.main-layout-tabs :deep(.n-tabs-nav) {
+  margin-bottom: 1.25rem;
+}
+
+.main-layout-tabs :deep(.n-tabs-tab) {
+  min-width: 132px;
+  justify-content: center;
+}
+</style>

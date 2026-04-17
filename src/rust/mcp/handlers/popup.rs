@@ -110,7 +110,7 @@ pub fn create_tauri_popup(request: &PopupRequest) -> Result<String> {
                             )?;
                             clear_project_popup_state(scope, &request.id)?;
                         }
-                        return Ok("用户长时间未响应，寸止已停止自动重发".to_string());
+                        return Ok("用户长时间未响应，cunzhi 已停止自动重发".to_string());
                     }
 
                     retry_count += 1;
@@ -381,7 +381,7 @@ fn build_project_request_conflict_error(state: &ProjectPopupState) -> anyhow::Er
     let now = Utc::now();
     let remaining_seconds = (state.expires_at - now).num_seconds().max(1);
     anyhow::anyhow!(
-        "当前项目 `{}` 已有未过期的寸止请求，剩余 {} 秒，请勿重复发起。",
+        "当前项目 `{}` 已有未过期的 cunzhi 请求，剩余 {} 秒，请勿重复发起。",
         state.project_name,
         remaining_seconds
     )

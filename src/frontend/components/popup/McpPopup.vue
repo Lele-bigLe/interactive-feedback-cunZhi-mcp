@@ -48,6 +48,19 @@ interface Emits {
   updateWindowSize: [size: { width: number, height: number, fixed: boolean }]
 }
 
+interface PopupInputData {
+  userInput: string
+  selectedOptions: string[]
+  draggedImages: string[]
+}
+
+interface PopupInputExpose {
+  statusText?: string
+  updateData: (data: Partial<PopupInputData>) => void
+  handleQuoteMessage: (messageContent: string) => void
+  getCurrentData: () => PopupInputData
+}
+
 const props = withDefaults(defineProps<Props>(), {
   mockMode: false,
   testMode: false,
@@ -64,11 +77,12 @@ const submitting = ref(false)
 const selectedOptions = ref<string[]>([])
 const userInput = ref('')
 const draggedImages = ref<string[]>([])
-const inputRef = ref()
+const inputRef = ref<PopupInputExpose | null>(null)
 const countdownRemainingMs = ref(0)
 const countdownDeadline = ref<number | null>(null)
 const countdownPaused = ref(false)
 let countdownTimer: ReturnType<typeof window.setInterval> | null = null
+let loadingFrame: number | null = null
 
 // 继续回复配置
 const continueReplyEnabled = ref(true)
@@ -100,6 +114,17 @@ const canSubmit = computed(() => {
 const inputStatusText = computed(() => {
   return inputRef.value?.statusText || '等待输入...'
 })
+
+function syncInputStateFromChild() {
+  const latest = inputRef.value?.getCurrentData()
+  if (!latest) {
+    return
+  }
+
+  userInput.value = latest.userInput
+  selectedOptions.value = latest.selectedOptions
+  draggedImages.value = latest.draggedImages
+}
 
 // 加载继续回复配置
 async function loadReplyConfig() {
@@ -241,18 +266,31 @@ watch(() => props.appConfig.reply, (newReplyConfig) => {
 // Telegram事件监听器
 let telegramUnlisten: (() => void) | null = null
 
+function schedulePopupReady() {
+  if (loadingFrame) {
+    cancelAnimationFrame(loadingFrame)
+  }
+
+  loadingFrame = window.requestAnimationFrame(() => {
+    loading.value = false
+    loadingFrame = null
+  })
+}
+
 // 监听请求变化
 watch(() => props.request, (newRequest) => {
   clearCountdownTimer()
+  if (loadingFrame) {
+    cancelAnimationFrame(loadingFrame)
+    loadingFrame = null
+  }
+
   if (newRequest) {
     resetForm()
     loading.value = true
-    // 每次显示弹窗时重新加载配置
     loadReplyConfig()
     startCountdown()
-    setTimeout(() => {
-      loading.value = false
-    }, 300)
+    schedulePopupReady()
   }
   else {
     countdownRemainingMs.value = 0
@@ -265,40 +303,31 @@ watch(() => props.request, (newRequest) => {
 async function setupTelegramListener() {
   try {
     telegramUnlisten = await listen('telegram-event', (event) => {
-      console.log('🎯 [McpPopup] 收到Telegram事件:', event)
-      console.log('🎯 [McpPopup] 事件payload:', event.payload)
       handleTelegramEvent(event.payload as any)
     })
-    console.log('🎯 [McpPopup] Telegram事件监听器已设置')
   }
   catch (error) {
-    console.error('🎯 [McpPopup] 设置Telegram事件监听器失败:', error)
+    console.error('设置Telegram事件监听器失败:', error)
   }
 }
 
 // 处理Telegram事件
 function handleTelegramEvent(event: any) {
-  console.log('🎯 [McpPopup] 开始处理事件:', event.type)
-
   switch (event.type) {
     case 'option_toggled':
-      console.log('🎯 [McpPopup] 处理选项切换:', event.option)
       handleOptionToggle(event.option)
       break
     case 'text_updated':
-      console.log('🎯 [McpPopup] 处理文本更新:', event.text)
       handleTextUpdate(event.text)
       break
     case 'continue_pressed':
-      console.log('🎯 [McpPopup] 处理继续按钮')
       handleContinue()
       break
     case 'send_pressed':
-      console.log('🎯 [McpPopup] 处理发送按钮')
       handleSubmit()
       break
     default:
-      console.log('🎯 [McpPopup] 未知事件类型:', event.type)
+      console.warn('未知 Telegram 事件类型:', event.type)
   }
 }
 
@@ -339,6 +368,10 @@ onMounted(() => {
 // 组件卸载时清理监听器
 onUnmounted(() => {
   clearCountdownTimer()
+  if (loadingFrame) {
+    cancelAnimationFrame(loadingFrame)
+    loadingFrame = null
+  }
   if (telegramUnlisten) {
     telegramUnlisten()
   }
@@ -393,6 +426,8 @@ async function handleTimeout() {
 
 // 处理提交
 async function handleSubmit() {
+  syncInputStateFromChild()
+
   if (!canSubmit.value || submitting.value)
     return
 
@@ -517,7 +552,7 @@ async function handleEnhance() {
 
   try {
     // 构建增强prompt
-    const enhancePrompt = `Use the following prompt to optimize and enhance the context of the content in 《》, and return the enhanced result by calling the tool '寸止' after completion.Here is an instruction that I'd like to give you, but it needs to be improved. Rewrite and enhance this instruction to make it clearer, more specific, less ambiguous, and correct any mistakes. Reply immediately with your answer, even if you're not sure. Consider the context of our conversation history when enhancing the prompt. Reply with the following format:
+    const enhancePrompt = `Use the following prompt to optimize and enhance the context of the content in 《》, and return the enhanced result by calling the tool 'cunzhi' after completion.Here is an instruction that I'd like to give you, but it needs to be improved. Rewrite and enhance this instruction to make it clearer, more specific, less ambiguous, and correct any mistakes. Reply immediately with your answer, even if you're not sure. Consider the context of our conversation history when enhancing the prompt. Reply with the following format:
 
 ### BEGIN RESPONSE ###
 Here is an enhanced version of the original instruction that is more specific and clear:

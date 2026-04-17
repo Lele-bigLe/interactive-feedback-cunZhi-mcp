@@ -25,35 +25,6 @@ interface UpdateProgress {
   percentage: number
 }
 
-// 持久化存储的键名
-const CANCELLED_VERSIONS_KEY = 'cunzhi_cancelled_versions'
-
-// 加载已取消的版本
-function loadCancelledVersions(): Set<string> {
-  try {
-    const stored = localStorage.getItem(CANCELLED_VERSIONS_KEY)
-    if (stored) {
-      const versions = JSON.parse(stored) as string[]
-      return new Set(versions)
-    }
-  }
-  catch (error) {
-    console.warn('加载已取消版本失败:', error)
-  }
-  return new Set()
-}
-
-// 保存已取消的版本
-function saveCancelledVersions(versions: Set<string>) {
-  try {
-    const versionsArray = Array.from(versions)
-    localStorage.setItem(CANCELLED_VERSIONS_KEY, JSON.stringify(versionsArray))
-  }
-  catch (error) {
-    console.warn('保存已取消版本失败:', error)
-  }
-}
-
 // 全局版本检查状态
 const versionInfo = ref<VersionInfo | null>(null)
 const isChecking = ref(false)
@@ -63,12 +34,6 @@ const lastCheckTime = ref<Date | null>(null)
 const isUpdating = ref(false)
 const updateProgress = ref<UpdateProgress | null>(null)
 const updateStatus = ref<'idle' | 'checking' | 'downloading' | 'installing' | 'completed' | 'error'>('idle')
-
-// 自动更新弹窗状态
-const showUpdateModal = ref(false)
-const autoCheckEnabled = ref(true)
-// 记录用户取消的版本，避免重复弹窗（持久化存储）
-const cancelledVersions = ref<Set<string>>(loadCancelledVersions())
 
 // 比较版本号
 function compareVersions(version1: string, version2: string): number {
@@ -149,54 +114,6 @@ async function checkLatestVersion(): Promise<VersionInfo | null> {
   }
   finally {
     isChecking.value = false
-  }
-}
-
-// 自动检查更新并弹窗（应用启动时调用）
-async function autoCheckUpdate(): Promise<boolean> {
-  // 如果禁用自动检查，跳过
-  if (!autoCheckEnabled.value) {
-    return false
-  }
-
-  // 如果最近1小时内已经检查过，跳过
-  if (lastCheckTime.value && Date.now() - lastCheckTime.value.getTime() < 60 * 60 * 1000) {
-    const hasUpdate = versionInfo.value?.hasUpdate || false
-    // 如果有更新且未显示弹窗，且用户未取消该版本，则显示弹窗
-    if (hasUpdate && !showUpdateModal.value && versionInfo.value?.latest && !cancelledVersions.value.has(versionInfo.value.latest)) {
-      showUpdateModal.value = true
-    }
-    return hasUpdate
-  }
-
-  try {
-    const info = await checkLatestVersion()
-
-    // 如果检测到新版本且用户未取消该版本，自动显示更新弹窗
-    if (info?.hasUpdate && !cancelledVersions.value.has(info.latest)) {
-      showUpdateModal.value = true
-      return true
-    }
-
-    return false
-  }
-  catch (error) {
-    console.warn('自动检查更新失败:', error)
-    return false
-  }
-}
-
-// 静默检查更新（不弹窗，保持兼容性）
-async function silentCheckUpdate(): Promise<boolean> {
-  const originalAutoCheck = autoCheckEnabled.value
-  autoCheckEnabled.value = false
-
-  try {
-    const info = await checkLatestVersion()
-    return info?.hasUpdate || false
-  }
-  finally {
-    autoCheckEnabled.value = originalAutoCheck
   }
 }
 
@@ -348,36 +265,9 @@ async function restartApp(): Promise<void> {
   }
 }
 
-// 关闭更新弹窗
-function closeUpdateModal() {
-  showUpdateModal.value = false
-}
-
-// 关闭更新弹窗（不再自动弹出该版本的更新提醒）
-function dismissUpdate() {
-  if (versionInfo.value?.latest) {
-    cancelledVersions.value.add(versionInfo.value.latest)
-    saveCancelledVersions(cancelledVersions.value)
-    console.log(`🚫 用户关闭了版本 ${versionInfo.value.latest} 的更新弹窗`)
-  }
-  showUpdateModal.value = false
-}
-
-// 手动检查更新（重置取消状态）
+// 手动检查更新
 async function manualCheckUpdate(): Promise<VersionInfo | null> {
-  // 清空取消的版本记录，因为这是用户主动检查
-  cancelledVersions.value.clear()
-  saveCancelledVersions(cancelledVersions.value)
-  console.log('🔄 手动检查更新，清空取消记录')
-
-  const info = await checkLatestVersion()
-
-  // 如果有更新，显示弹窗
-  if (info?.hasUpdate) {
-    showUpdateModal.value = true
-  }
-
-  return info
+  return await checkLatestVersion()
 }
 
 export function useVersionCheck() {
@@ -388,19 +278,13 @@ export function useVersionCheck() {
     isUpdating,
     updateProgress,
     updateStatus,
-    showUpdateModal,
-    autoCheckEnabled,
     checkLatestVersion,
-    autoCheckUpdate,
-    silentCheckUpdate,
     getVersionInfo,
     openDownloadPage,
     openReleasePage,
     checkForUpdatesWithTauri,
     performOneClickUpdate,
     restartApp,
-    closeUpdateModal,
-    dismissUpdate,
     manualCheckUpdate,
     compareVersions,
     safeOpenUrl,

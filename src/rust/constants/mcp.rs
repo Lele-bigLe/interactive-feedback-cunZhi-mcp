@@ -3,14 +3,8 @@
 /// 寸止工具标识符
 pub const TOOL_ZHI: &str = "zhi";
 
-/// 记忆管理工具标识符
-pub const TOOL_JI: &str = "ji";
-
-/// 代码搜索工具标识符
-pub const TOOL_SOU: &str = "sou";
-
 /// 默认启用的工具列表
-pub const DEFAULT_ENABLED_TOOLS: &[&str] = &[TOOL_ZHI, TOOL_JI, TOOL_SOU];
+pub const DEFAULT_ENABLED_TOOLS: &[&str] = &[TOOL_ZHI];
 
 /// 继续回复默认启用状态
 pub const DEFAULT_CONTINUE_REPLY_ENABLED: bool = true;
@@ -59,11 +53,7 @@ pub struct McpConfig {
 impl Default for McpConfig {
     fn default() -> Self {
         Self {
-            tools: vec![
-                McpToolConfig::new(TOOL_ZHI, true, false), // 寸止工具不可禁用
-                McpToolConfig::new(TOOL_JI, false, true),  // 记忆管理工具可禁用，默认关闭
-                McpToolConfig::new(TOOL_SOU, false, true), // 代码搜索工具可禁用，默认关闭
-            ],
+            tools: vec![McpToolConfig::new(TOOL_ZHI, true, false)], // 寸止工具不可禁用
             continue_reply_enabled: DEFAULT_CONTINUE_REPLY_ENABLED,
             auto_continue_threshold: DEFAULT_AUTO_CONTINUE_THRESHOLD,
             continue_prompt: DEFAULT_CONTINUE_PROMPT.to_string(),
@@ -124,5 +114,5 @@ pub fn get_default_mcp_config() -> McpConfig {
 
 /// 检查是否为有效的工具 ID
 pub fn is_valid_tool_id(tool_id: &str) -> bool {
-    matches!(tool_id, TOOL_ZHI | TOOL_JI | TOOL_SOU)
+    matches!(tool_id, TOOL_ZHI)
 }

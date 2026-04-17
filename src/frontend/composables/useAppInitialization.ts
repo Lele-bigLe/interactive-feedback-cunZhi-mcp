@@ -2,7 +2,6 @@ import { ref } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useFontManager } from './useFontManager'
 import { useSettings } from './useSettings'
-import { useVersionCheck } from './useVersionCheck'
 
 /**
  * 应用初始化组合式函数
@@ -11,7 +10,6 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
   const isInitializing = ref(true)
   const { loadFontConfig } = useFontManager()
   const settings = useSettings()
-  const { autoCheckUpdate } = useVersionCheck()
   const { getCliArgs, checkMcpModeWithArgs, setupMcpEventListener, restorePendingMcpRequest } = mcpHandler
 
   function runDeferredStartupTasks() {
@@ -23,10 +21,6 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
       catch (error) {
         console.warn('延后加载窗口配置失败:', error)
       }
-
-      autoCheckUpdate().catch(() => {
-        // 静默处理版本检查失败
-      })
     }, 0)
   }
 

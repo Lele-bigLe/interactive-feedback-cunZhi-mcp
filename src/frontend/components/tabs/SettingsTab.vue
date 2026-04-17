@@ -103,11 +103,59 @@ interface Emits {
 function handleWindowSizeUpdate(size: { width: number, height: number, fixed: boolean }) {
   emit('updateWindowSize', size)
 }
+
+async function openInteractionPreview() {
+  try {
+    const zhiConfig = await invoke('get_zhi_tool_config') as {
+      request_timeout_ms?: number
+    }
+    const timeoutMs = Math.max(60 * 1000, Number(zhiConfig.request_timeout_ms || 5 * 60 * 1000))
+
+    const request = {
+      id: `settings-preview-${Date.now()}`,
+      message: '这是 cunzhi 的交互页面预览。请在这里检查快捷模板、上下文追加、图片预览、补充说明输入框和底部操作区的布局是否正常。',
+      predefined_options: ['结束'],
+      is_markdown: false,
+      project_name: 'cunzhi 交互预览',
+      timeout_ms: timeoutMs,
+      retry_count: 0,
+      force_frontend_popup: true,
+    }
+
+    await invoke('create_test_popup', { request })
+    message.success('已打开交互页面预览')
+  }
+  catch (error) {
+    console.error('打开交互页面预览失败:', error)
+    message.error('打开交互页面预览失败')
+  }
+}
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto tab-content">
-    <n-collapse size="large" :default-expanded-names="[]" arrow-placement="right">
+  <div class="max-w-3xl mx-auto tab-content settings-panel">
+    <n-space vertical size="large">
+      <n-card size="small" class="settings-hero-card">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div class="text-lg font-medium tracking-tight mb-1">
+              设置中心
+            </div>
+            <div class="text-sm opacity-60 leading-relaxed">
+              在这里调整主题、字体、窗口和回复策略。也可以直接打开真实交互页面，检查运行态布局和操作链路。
+            </div>
+          </div>
+
+          <n-button type="primary" @click="openInteractionPreview">
+            <template #icon>
+              <div class="i-carbon-launch" />
+            </template>
+            打开交互页面
+          </n-button>
+        </div>
+      </n-card>
+
+      <n-collapse class="settings-collapse" size="large" :default-expanded-names="[]" arrow-placement="right">
       <!-- 主题设置 -->
       <n-collapse-item name="theme">
         <template #header>
@@ -403,11 +451,26 @@ function handleWindowSizeUpdate(size: { width: number, height: number, fixed: bo
           <VersionChecker />
         </div>
       </n-collapse-item>
-    </n-collapse>
+      </n-collapse>
+    </n-space>
   </div>
 </template>
 
 <style>
+.settings-panel :deep(.n-collapse-item__header-main) {
+  width: 100%;
+}
+
+.settings-panel :deep(.n-collapse-item__header) {
+  align-items: center;
+  padding-block: 18px;
+}
+
+.settings-panel :deep(.n-collapse-item__header-extra),
+.settings-panel :deep(.n-collapse-item-arrow) {
+  align-self: center;
+}
+
 /* 移除子组件的卡片样式，因为现在由折叠面板提供容器 */
 .setting-content :deep(.n-card) {
   background: transparent;

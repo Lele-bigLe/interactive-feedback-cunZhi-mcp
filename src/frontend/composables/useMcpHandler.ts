@@ -92,6 +92,20 @@ export function useMcpHandler() {
    * 显示MCP弹窗
    */
   async function showMcpDialog(request: any) {
+    if (request?.force_frontend_popup) {
+      mcpRequest.value = request
+      showMcpPopup.value = true
+
+      try {
+        await invoke('play_notification_sound')
+      }
+      catch (error) {
+        console.error('播放音频通知失败:', error)
+      }
+
+      return
+    }
+
     // 获取Telegram配置，检查是否需要隐藏前端弹窗
     let shouldShowFrontendPopup = true
     try {

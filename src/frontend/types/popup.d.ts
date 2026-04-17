@@ -9,6 +9,7 @@ export interface McpRequest {
   project_name?: string
   timeout_ms?: number
   retry_count?: number
+  force_frontend_popup?: boolean
 }
 
 // 自定义prompt类型定义

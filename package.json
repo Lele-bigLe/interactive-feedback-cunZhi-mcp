@@ -11,6 +11,7 @@
     "tauri": "cargo tauri",
     "tauri:dev": "cargo tauri dev",
     "tauri:build": "cargo tauri build",
+    "tauri:build:portable": "pnpm tauri build --no-bundle && node ./gen/stage-release-exes.mjs",
     "test:ui": "cd src/frontend/test && vite",
     "test:ui:build": "cd src/frontend/test && vite build"
   },

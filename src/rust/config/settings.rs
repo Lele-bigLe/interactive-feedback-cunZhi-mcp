@@ -362,8 +362,6 @@ pub fn default_mcp_request_timeout_ms() -> u64 {
 pub fn default_mcp_tools() -> HashMap<String, bool> {
     let mut tools = HashMap::new();
     tools.insert(mcp::TOOL_ZHI.to_string(), true); // 寸止工具默认启用
-    tools.insert(mcp::TOOL_JI.to_string(), false); // 记忆管理工具默认关闭
-    tools.insert(mcp::TOOL_SOU.to_string(), false); // 代码搜索工具默认关闭
     tools
 }
 

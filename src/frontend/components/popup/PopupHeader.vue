@@ -46,7 +46,7 @@ function handleToggleAlwaysOnTop() {
         <div class="w-3 h-3 rounded-full bg-primary-500" />
         <div>
           <h1 class="app-panel-title text-base font-semibold text-white leading-tight">
-            寸止
+            cunzhi
           </h1>
           <p class="app-panel-caption text-xs text-white/50 uppercase tracking-[0.18em] mt-1">
             CUNZHI INTERACTION PANEL
@@ -75,7 +75,7 @@ function handleToggleAlwaysOnTop() {
           size="small"
           quaternary
           circle
-          :title="props.showMainLayout ? '返回聊天' : '打开设置'"
+          :title="props.showMainLayout ? '返回交互面板' : '打开设置'"
           @click="handleOpenMainLayout"
         >
           <template #icon>

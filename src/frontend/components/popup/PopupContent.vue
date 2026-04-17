@@ -3,7 +3,7 @@ import type { McpRequest } from '../../types/popup'
 import hljs from 'highlight.js'
 import MarkdownIt from 'markdown-it'
 import { useMessage } from 'naive-ui'
-import { nextTick, onMounted, onUpdated, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
@@ -47,27 +47,6 @@ function quoteMessage() {
   }
 }
 
-// 动态导入代码高亮样式，根据主题切换
-
-// 动态加载代码高亮样式
-function loadHighlightStyle(theme: string) {
-  // 移除现有的highlight.js样式
-  const existingStyle = document.querySelector('link[data-highlight-theme]')
-  if (existingStyle) {
-    existingStyle.remove()
-  }
-
-  // 根据主题选择样式
-  const styleName = theme === 'light' ? 'github' : 'github-dark'
-
-  // 动态创建样式链接
-  const link = document.createElement('link')
-  link.rel = 'stylesheet'
-  link.href = `https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/${styleName}.min.css`
-  link.setAttribute('data-highlight-theme', theme)
-  document.head.appendChild(link)
-}
-
 interface Props {
   request: McpRequest | null
   loading?: boolean
@@ -79,6 +58,7 @@ interface Emits {
 }
 
 const message = useMessage()
+const markdownContentRef = ref<HTMLElement | null>(null)
 
 // 创建 Markdown 实例 - 保持代码高亮功能
 const md = new MarkdownIt({
@@ -226,9 +206,15 @@ function createCopyButton(preEl: Element) {
 }
 
 // 设置内联代码复制
-function setupInlineCodeCopy() {
-  const inlineCodeElements = document.querySelectorAll('.markdown-content p code, .markdown-content li code')
+function setupInlineCodeCopy(root: HTMLElement) {
+  const inlineCodeElements = root.querySelectorAll('p code, li code')
   inlineCodeElements.forEach((codeEl) => {
+    const inlineCodeEl = codeEl as HTMLElement
+    if (inlineCodeEl.dataset.copyBound === 'true') {
+      return
+    }
+
+    inlineCodeEl.dataset.copyBound = 'true'
     codeEl.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(codeEl.textContent || '')
@@ -243,67 +229,46 @@ function setupInlineCodeCopy() {
 
 // 设置代码复制功能
 let setupCodeCopyTimer: number | null = null
-function setupCodeCopy() {
+function setupCodeCopy(root: HTMLElement) {
   if (setupCodeCopyTimer) {
     clearTimeout(setupCodeCopyTimer)
   }
 
-  // 增加延迟时间，确保DOM完全渲染
   setupCodeCopyTimer = window.setTimeout(() => {
     nextTick(() => {
-      // 确保选择正确的 pre 元素
-      const preElements = document.querySelectorAll('.markdown-content pre')
-      console.log('设置代码复制按钮，找到', preElements.length, '个代码块')
+      const preElements = root.querySelectorAll('pre')
       preElements.forEach((preEl) => {
         createCopyButton(preEl)
       })
-      setupInlineCodeCopy()
-
-      // 如果没有找到代码块，再次尝试
-      if (preElements.length === 0) {
-        setTimeout(() => {
-          const retryElements = document.querySelectorAll('.markdown-content pre')
-          console.log('重试设置代码复制按钮，找到', retryElements.length, '个代码块')
-          retryElements.forEach((preEl) => {
-            createCopyButton(preEl)
-          })
-        }, 200)
-      }
+      setupInlineCodeCopy(root)
     })
-  }, 300)
+  }, 0)
 }
 
-// 监听request变化，重新设置代码复制
-watch(() => props.request, () => {
-  if (props.request) {
-    setupCodeCopy()
+function syncCodeCopyBindings() {
+  const root = markdownContentRef.value
+  if (!root || props.loading || !props.request?.message || !props.request.is_markdown) {
+    return
   }
-}, { deep: true })
 
-// 监听loading状态变化
-watch(() => props.loading, (newLoading) => {
-  if (!newLoading && props.request) {
-    setupCodeCopy()
-  }
-})
+  setupCodeCopy(root)
+}
+
+watch(
+  () => [props.request?.message, props.request?.is_markdown, props.loading],
+  () => {
+    syncCodeCopyBindings()
+  },
+)
 
 onMounted(() => {
-  // 初始化代码高亮样式
-  loadHighlightStyle(props.currentTheme)
-  if (props.request) {
-    setupCodeCopy()
-  }
+  syncCodeCopyBindings()
 })
 
-// 监听主题变化
-watch(() => props.currentTheme, (newTheme) => {
-  loadHighlightStyle(newTheme)
-}, { immediate: false })
-
-// 在DOM更新后也尝试设置
-onUpdated(() => {
-  if (props.request && !props.loading) {
-    setupCodeCopy()
+onBeforeUnmount(() => {
+  if (setupCodeCopyTimer) {
+    clearTimeout(setupCodeCopyTimer)
+    setupCodeCopyTimer = null
   }
 })
 </script>
@@ -323,6 +288,7 @@ onUpdated(() => {
       <!-- 主要内容 -->
       <div
         v-if="request.is_markdown"
+        ref="markdownContentRef"
         class="markdown-content prose prose-sm max-w-none prose-headings:font-semibold prose-headings:leading-tight prose-h1:!mt-4 prose-h1:!mb-2 prose-h1:!text-lg prose-h1:!font-bold prose-h1:!leading-tight prose-h2:!mt-3 prose-h2:!mb-1.5 prose-h2:!text-base prose-h2:!font-semibold prose-h2:!leading-tight prose-h3:!mt-2.5 prose-h3:!mb-1 prose-h3:!text-sm prose-h3:!font-medium prose-h3:!leading-tight prose-h4:!mt-2 prose-h4:!mb-1 prose-h4:!text-sm prose-h4:!font-medium prose-h4:!leading-tight prose-p:my-1 prose-p:leading-relaxed prose-p:text-sm prose-ul:my-1 prose-ul:text-sm prose-ul:pl-4 prose-ol:my-1 prose-ol:text-sm prose-ol:pl-4 prose-li:my-1 prose-li:text-sm prose-li:leading-relaxed prose-blockquote:my-2 prose-blockquote:text-sm prose-blockquote:pl-4 prose-blockquote:ml-0 prose-blockquote:italic prose-blockquote:border-l-4 prose-blockquote:border-primary-500 prose-pre:relative prose-pre:border prose-pre:rounded-lg prose-pre:p-4 prose-pre:my-3 prose-pre:overflow-x-auto scrollbar-code prose-code:px-1 prose-code:py-0.5 prose-code:text-xs prose-code:cursor-pointer prose-code:font-mono prose-a:text-primary-500 prose-a:no-underline prose-a:cursor-default [&_a[onclick='return false;']]:opacity-60 [&_a[onclick='return false;']]:cursor-not-allowed" :class="[
           currentTheme === 'light' ? 'prose-slate' : 'prose-invert',
           currentTheme === 'light' ? 'prose-headings:text-gray-900' : 'prose-headings:text-white',
