@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
-import { useMessage } from 'naive-ui'
 import { ref } from 'vue'
 import IntroTab from '../tabs/IntroTab.vue'
 import McpToolsTab from '../tabs/McpToolsTab.vue'
@@ -38,7 +36,6 @@ function handleConfigReloaded() {
 }
 
 const activeTab = ref('intro')
-const message = useMessage()
 
 // 图标加载错误处理
 function handleImageError(event: Event) {
@@ -46,46 +43,6 @@ function handleImageError(event: Event) {
   // 如果图标加载失败，隐藏图片元素
   img.style.display = 'none'
   console.warn('LOGO图标加载失败，已隐藏')
-}
-
-// 测试popup功能 - 创建独立的popup窗口
-async function showTestMcpPopup() {
-  try {
-    // 创建测试请求数据
-    const testRequest = {
-      id: `test-${Date.now()}`,
-      message: `# 🧪 测试弹窗功能
-
-这是一个**测试弹窗**，用于验证MCP popup组件的功能。
-
-## 功能特性
-- ✅ 支持 Markdown 格式显示
-- ✅ 支持预定义选项选择
-- ✅ 支持自由文本输入
-- ✅ 支持图片粘贴上传
-
-## 代码示例
-\`\`\`javascript
-// 这是一个代码示例
-function testPopup() {
-  console.log('测试弹窗功能')
-  return '成功'
-}
-\`\`\`
-
-请选择您要测试的功能，或者在下方输入框中添加您的反馈。`,
-      predefined_options: ['测试选项功能', '测试文本输入', '测试图片上传', '测试Markdown渲染'],
-      is_markdown: true,
-    }
-
-    // 调用Tauri命令创建popup窗口
-    await invoke('create_test_popup', { request: testRequest })
-    message.success('测试popup窗口已创建')
-  }
-  catch (error) {
-    console.error('创建测试popup失败:', error)
-    message.error(`创建测试popup失败: ${error}`)
-  }
 }
 </script>
 
@@ -97,30 +54,21 @@ function testPopup() {
         <!-- 标题区域 -->
         <div class="text-center mb-8">
           <!-- 主标题 -->
-          <div class="flex items-center justify-center gap-3 mb-3" data-guide="app-logo">
+          <div class="flex items-center justify-center gap-4 mb-3" data-guide="app-logo">
             <img
               src="/icons/icon-128.png"
               alt="cunzhi Logo"
               class="w-10 h-10 rounded-xl shadow-lg"
               @error="handleImageError"
             >
-            <h1 class="text-4xl font-medium text-white">
-              cunzhi
-            </h1>
-            <!-- 测试按钮 -->
-            <n-button
-              size="small"
-              type="tertiary"
-              circle
-              title="测试 Popup 功能"
-              class="ml-2"
-              data-guide="test-button"
-              @click="showTestMcpPopup"
-            >
-              <template #icon>
-                <div class="i-carbon-test-tool w-4 h-4" />
-              </template>
-            </n-button>
+            <div class="text-left">
+              <div class="app-panel-title text-4xl font-semibold text-white leading-none">
+                寸止
+              </div>
+              <div class="app-panel-caption mt-2 text-sm text-white/55 uppercase tracking-[0.22em]">
+                CUNZHI INTERACTION PANEL
+              </div>
+            </div>
           </div>
 
           <!-- 服务器状态 -->
@@ -134,24 +82,25 @@ function testPopup() {
           </div>
 
           <!-- 副标题 -->
-          <p class="text-base opacity-50 font-normal text-white">
-            告别AI提前终止烦恼，助力AI更加持久
+          <p class="text-base opacity-50 font-normal text-white app-panel-title">
+            项目级 AI 交互面板，减少流程中断与状态丢失
           </p>
         </div>
 
         <!-- Tab组件 -->
         <n-tabs v-model:value="activeTab" type="segment" size="small" justify-content="center" data-guide="tabs">
           <n-tab-pane name="intro" tab="介绍">
-            <IntroTab />
+            <IntroTab v-if="activeTab === 'intro'" />
           </n-tab-pane>
           <n-tab-pane name="mcp-tools" tab="MCP 工具">
-            <McpToolsTab />
+            <McpToolsTab v-if="activeTab === 'mcp-tools'" />
           </n-tab-pane>
           <n-tab-pane name="prompts" tab="参考提示词">
-            <PromptsTab />
+            <PromptsTab v-if="activeTab === 'prompts'" />
           </n-tab-pane>
           <n-tab-pane name="settings" tab="设置" data-guide="settings-tab">
             <SettingsTab
+              v-if="activeTab === 'settings'"
               :current-theme="currentTheme"
               :always-on-top="alwaysOnTop"
               :audio-notification-enabled="audioNotificationEnabled"

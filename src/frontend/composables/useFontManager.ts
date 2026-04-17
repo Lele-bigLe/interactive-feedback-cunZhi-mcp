@@ -23,11 +23,29 @@ export interface FontSizeOption {
  * 字体管理组合式函数
  */
 export function useFontManager() {
+  const fallbackFontFamilies: Record<string, string> = {
+    'formal-ui': `'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif`,
+    inter: `Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`,
+    'jetbrains-mono': `JetBrains Mono, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace`,
+    system: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
+    arial: `Arial, 'Helvetica Neue', Helvetica, sans-serif`,
+    helvetica: `'Helvetica Neue', Helvetica, Arial, sans-serif`,
+    times: `'Times New Roman', Times, serif`,
+    georgia: `Georgia, 'Times New Roman', Times, serif`,
+    courier: `'Courier New', Courier, monospace`,
+    verdana: `Verdana, Geneva, sans-serif`,
+    tahoma: `Tahoma, Geneva, sans-serif`,
+    'microsoft-yahei': `'Microsoft YaHei', 'Microsoft YaHei UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif`,
+    pingfang: `'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif`,
+    'noto-sans-cjk': `'Noto Sans CJK SC', 'Source Han Sans SC', 'Microsoft YaHei', sans-serif`,
+    'source-han-sans': `'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif`,
+  }
+
   // 响应式状态
   const fontConfig = ref<FontInfo>({
-    font_family: 'inter',
+    font_family: 'formal-ui',
     font_size: 'medium',
-    custom_font_family: 'Inter, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif',
+    custom_font_family: `'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif`,
   })
 
   const fontFamilyOptions = ref<FontFamilyOption[]>([])
@@ -40,7 +58,7 @@ export function useFontManager() {
     }
 
     const option = fontFamilyOptions.value.find(opt => opt.id === fontConfig.value.font_family)
-    return option?.css_value || fontFamilyOptions.value[0]?.css_value || 'Inter, sans-serif'
+    return option?.css_value || fallbackFontFamilies[fontConfig.value.font_family] || fallbackFontFamilies['formal-ui']
   })
 
   // 计算当前字体大小比例

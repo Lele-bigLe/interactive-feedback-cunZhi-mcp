@@ -411,6 +411,14 @@ pub async fn send_mcp_response(
     response: serde_json::Value,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    {
+        let mut pending_request = state
+            .pending_mcp_request
+            .lock()
+            .map_err(|e| format!("清理待处理弹窗请求失败: {}", e))?;
+        pending_request.take();
+    }
+
     // 将响应序列化为JSON字符串
     let response_str =
         serde_json::to_string(&response).map_err(|e| format!("序列化响应失败: {}", e))?;
@@ -488,6 +496,18 @@ pub fn read_mcp_request(file_path: String) -> Result<serde_json::Value, String> 
 }
 
 #[tauri::command]
+pub fn consume_pending_mcp_request(
+    state: State<'_, AppState>,
+) -> Result<Option<serde_json::Value>, String> {
+    let mut pending_request = state
+        .pending_mcp_request
+        .lock()
+        .map_err(|e| format!("获取待处理弹窗请求失败: {}", e))?;
+
+    Ok(pending_request.take())
+}
+
+#[tauri::command]
 pub async fn select_image_files() -> Result<Vec<String>, String> {
     // 简化版本：返回测试图片数据
     // 在实际应用中，这里应该调用系统文件对话框
@@ -561,8 +581,17 @@ pub fn build_mcp_continue_response(
 #[tauri::command]
 pub async fn create_test_popup(
     request: serde_json::Value,
+    state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<String, String> {
+    {
+        let mut pending_request = state
+            .pending_mcp_request
+            .lock()
+            .map_err(|e| format!("缓存测试弹窗请求失败: {}", e))?;
+        *pending_request = Some(request.clone());
+    }
+
     // 测试弹窗直接通过 Tauri 事件触发前端弹窗（不走 IPC/子进程）
     if let Some(window) = app.get_webview_window("main") {
         use tauri::Emitter;

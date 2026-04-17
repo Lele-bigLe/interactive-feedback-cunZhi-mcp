@@ -10,6 +10,32 @@ export function useMcpHandler() {
   const mcpRequest = ref(null)
   const showMcpPopup = ref(false)
   const isDaemonMode = ref(false)
+  let mcpEventUnlisten: (() => void) | null = null
+
+  function getRequestId(request: any) {
+    return typeof request?.id === 'string' ? request.id : null
+  }
+
+  async function applyMcpRequest(request: any) {
+    const incomingRequestId = getRequestId(request)
+    const currentRequestId = getRequestId(mcpRequest.value)
+
+    if (showMcpPopup.value && incomingRequestId && currentRequestId === incomingRequestId) {
+      return
+    }
+
+    await showMcpDialog(request)
+  }
+
+  async function getCliArgs() {
+    try {
+      return await invoke('get_cli_args') as any
+    }
+    catch (error) {
+      console.error('获取 CLI 参数失败:', error)
+      return {}
+    }
+  }
 
   /**
    * 统一的MCP响应处理
@@ -117,9 +143,11 @@ export function useMcpHandler() {
    * 检查MCP模式
    */
   async function checkMcpMode() {
-    try {
-      const args = await invoke('get_cli_args')
+    return checkMcpModeWithArgs(await getCliArgs())
+  }
 
+  async function checkMcpModeWithArgs(args: any) {
+    try {
       // 检测守护进程模式
       if (args && (args as any).daemon) {
         isDaemonMode.value = true
@@ -131,7 +159,7 @@ export function useMcpHandler() {
         const content = await invoke('read_mcp_request', { filePath: (args as any).mcp_request })
 
         if (content) {
-          await showMcpDialog(content)
+          await applyMcpRequest(content)
         }
         return { isMcp: true, mcpContent: content }
       }
@@ -147,12 +175,35 @@ export function useMcpHandler() {
    */
   async function setupMcpEventListener() {
     try {
-      await listen('mcp-request', (event) => {
-        showMcpDialog(event.payload)
+      if (mcpEventUnlisten) {
+        return
+      }
+
+      mcpEventUnlisten = await listen('mcp-request', (event) => {
+        void applyMcpRequest(event.payload)
       })
     }
     catch (error) {
       console.error('设置MCP事件监听器失败:', error)
+    }
+  }
+
+  async function restorePendingMcpRequest() {
+    try {
+      const pendingRequest = await invoke('consume_pending_mcp_request') as any | null
+      if (pendingRequest) {
+        await applyMcpRequest(pendingRequest)
+      }
+    }
+    catch (error) {
+      console.error('恢复待处理弹窗请求失败:', error)
+    }
+  }
+
+  function cleanupMcpEventListener() {
+    if (mcpEventUnlisten) {
+      mcpEventUnlisten()
+      mcpEventUnlisten = null
     }
   }
 
@@ -163,7 +214,11 @@ export function useMcpHandler() {
     handleMcpResponse,
     handleMcpCancel,
     showMcpDialog,
+    getCliArgs,
     checkMcpMode,
+    checkMcpModeWithArgs,
     setupMcpEventListener,
+    restorePendingMcpRequest,
+    cleanupMcpEventListener,
   }
 }

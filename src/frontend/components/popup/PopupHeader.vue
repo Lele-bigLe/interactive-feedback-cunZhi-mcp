@@ -44,9 +44,14 @@ function handleToggleAlwaysOnTop() {
       <!-- 左侧：标题 -->
       <div class="flex items-center gap-3">
         <div class="w-3 h-3 rounded-full bg-primary-500" />
-        <h1 class="text-base font-medium text-white">
-          cunzhi - 告别AI提前终止烦恼，助力AI更加持久
-        </h1>
+        <div>
+          <h1 class="app-panel-title text-base font-semibold text-white leading-tight">
+            寸止
+          </h1>
+          <p class="app-panel-caption text-xs text-white/50 uppercase tracking-[0.18em] mt-1">
+            CUNZHI INTERACTION PANEL
+          </p>
+        </div>
       </div>
 
       <!-- 右侧：操作按钮 -->

@@ -1,17 +1,18 @@
 /// 字体配置常量
 
 // 默认字体系列
-pub const DEFAULT_FONT_FAMILY: &str = "inter";
+pub const DEFAULT_FONT_FAMILY: &str = "formal-ui";
 
 // 默认字体大小
 pub const DEFAULT_FONT_SIZE: &str = "medium";
 
 // 默认自定义字体系列
 pub const DEFAULT_CUSTOM_FONT_FAMILY: &str =
-    "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    "'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif";
 
 // 支持的字体系列选项
 pub const FONT_FAMILIES: &[(&str, &str, &str)] = &[
+    ("formal-ui", "正式面板", "'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', sans-serif"),
     ("inter", "Inter", "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"),
     ("jetbrains-mono", "JetBrains Mono", "JetBrains Mono, 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace"),
     ("system", "系统默认", "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"),

@@ -65,6 +65,7 @@ pub fn build_tauri_app() -> Builder<tauri::Wry> {
             send_mcp_response,
             get_cli_args,
             read_mcp_request,
+            consume_pending_mcp_request,
             select_image_files,
             build_mcp_send_response,
             build_mcp_continue_response,

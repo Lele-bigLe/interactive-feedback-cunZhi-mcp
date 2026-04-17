@@ -124,6 +124,19 @@ async fn handle_popup_request(
         }
     };
 
+    {
+        let state = app.state::<AppState>();
+        let mut pending_request = match state.pending_mcp_request.lock() {
+            Ok(request) => request,
+            Err(e) => {
+                return IpcResponse::Error {
+                    message: format!("缓存弹窗请求失败: {}", e),
+                };
+            }
+        };
+        *pending_request = Some(request_value.clone());
+    }
+
     if let Err(e) = app.emit("mcp-request", request_value) {
         return IpcResponse::Error {
             message: format!("发送弹窗事件失败: {}", e),

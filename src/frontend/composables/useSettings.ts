@@ -69,45 +69,30 @@ function createSettings() {
   // 加载窗口设置
   async function loadWindowSettings() {
     try {
-      // 首先加载窗口约束
-      await loadWindowConstraints()
+      const [, enabled, audioEnabled, audioUrlValue, windowSettings, replyConfig] = await Promise.all([
+        loadWindowConstraints(),
+        invoke('get_always_on_top'),
+        invoke('get_audio_notification_enabled'),
+        invoke('get_audio_url'),
+        invoke('get_window_settings').catch(() => null),
+        invoke('get_reply_config').catch(() => null),
+      ])
 
-      const enabled = await invoke('get_always_on_top')
       alwaysOnTop.value = enabled as boolean
-
-      // 加载音频通知设置
-      const audioEnabled = await invoke('get_audio_notification_enabled')
       audioNotificationEnabled.value = audioEnabled as boolean
-
-      // 加载音效URL设置
-      const audioUrlValue = await invoke('get_audio_url')
       audioUrl.value = audioUrlValue as string
 
-      // 加载窗口尺寸和模式设置
-      try {
-        const windowSettings = await invoke('get_window_settings')
-        if (windowSettings) {
-          const settings = windowSettings as any
-          windowWidth.value = settings.current_width || 600
-          windowHeight.value = settings.current_height || 900
-          fixedWindowSize.value = settings.fixed || false
-        }
-      }
-      catch {
-        console.log('窗口设置不存在，使用默认值')
+      if (windowSettings) {
+        const settings = windowSettings as any
+        windowWidth.value = settings.current_width || 600
+        windowHeight.value = settings.current_height || 900
+        fixedWindowSize.value = settings.fixed || false
       }
 
-      // 加载继续回复设置
-      try {
-        const replyConfig = await invoke('get_reply_config')
-        if (replyConfig) {
-          const config = replyConfig as any
-          continueReplyEnabled.value = config.enable_continue_reply || true
-          continuePrompt.value = config.continue_prompt || '请按照最佳实践继续'
-        }
-      }
-      catch {
-        console.log('继续回复设置不存在，使用默认值')
+      if (replyConfig) {
+        const config = replyConfig as any
+        continueReplyEnabled.value = config.enable_continue_reply || true
+        continuePrompt.value = config.continue_prompt || '请按照最佳实践继续'
       }
 
       // 同步窗口状态
@@ -398,6 +383,8 @@ function createSettings() {
   async function setupWindowFocusListener() {
     try {
       const webview = getCurrentWebviewWindow()
+
+      removeWindowFocusListener()
 
       // 监听窗口获得焦点事件（节流：5秒内不重复加载）
       windowFocusUnlisten = await webview.onFocusChanged(({ payload: focused }) => {

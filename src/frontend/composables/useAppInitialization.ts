@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useFontManager } from './useFontManager'
-import { initMcpTools } from './useMcpTools'
 import { useSettings } from './useSettings'
 import { useVersionCheck } from './useVersionCheck'
 
@@ -10,10 +9,26 @@ import { useVersionCheck } from './useVersionCheck'
  */
 export function useAppInitialization(mcpHandler: ReturnType<typeof import('./useMcpHandler').useMcpHandler>) {
   const isInitializing = ref(true)
-  const { loadFontConfig, loadFontOptions } = useFontManager()
+  const { loadFontConfig } = useFontManager()
   const settings = useSettings()
   const { autoCheckUpdate } = useVersionCheck()
-  const { checkMcpMode, setupMcpEventListener } = mcpHandler
+  const { getCliArgs, checkMcpModeWithArgs, setupMcpEventListener, restorePendingMcpRequest } = mcpHandler
+
+  function runDeferredStartupTasks() {
+    window.setTimeout(async () => {
+      try {
+        await settings.loadWindowConfig()
+        await settings.setupWindowFocusListener()
+      }
+      catch (error) {
+        console.warn('延后加载窗口配置失败:', error)
+      }
+
+      autoCheckUpdate().catch(() => {
+        // 静默处理版本检查失败
+      })
+    }, 0)
+  }
 
   /**
    * 检查是否为首次启动
@@ -38,23 +53,24 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
     try {
       // 检查是否为首次启动
       const isFirstRun = checkFirstRun()
+      const cliArgs = await getCliArgs()
+
+      await setupMcpEventListener()
+      await restorePendingMcpRequest()
+
+      const { isMcp, mcpContent } = await checkMcpModeWithArgs(cliArgs)
+      const isPopupSession = isMcp || mcpHandler.isDaemonMode.value
 
       // 主题已在useTheme初始化时加载，这里不需要重复加载
 
-      // 并行加载字体、窗口设置和检查 MCP 模式
-      const [,, { isMcp, mcpContent }] = await Promise.all([
+      // 并行加载首屏关键配置，避免弹窗被非关键任务阻塞
+      await Promise.all([
         loadFontConfig(),
-        loadFontOptions(),
-        checkMcpMode(),
         settings.loadWindowSettings(),
-        settings.loadWindowConfig(),
       ])
 
-      // 设置窗口焦点监听器，用于配置同步
-      await settings.setupWindowFocusListener()
-
       // 在MCP模式下，确保前端状态与后端窗口状态同步
-      if (isMcp) {
+      if (isPopupSession) {
         console.log('MCP模式检测到，同步窗口状态...')
         try {
           await settings.syncWindowStateFromBackend()
@@ -64,10 +80,8 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
         }
       }
 
-      // 初始化MCP工具配置（在非MCP模式下或守护进程模式下）
-      if (!isMcp || mcpHandler.isDaemonMode.value) {
-        await initMcpTools()
-        await setupMcpEventListener()
+      if (!isPopupSession) {
+        runDeferredStartupTasks()
       }
 
       // 如果是首次启动，标记已初始化（主题已在上面加载过）
@@ -75,11 +89,6 @@ export function useAppInitialization(mcpHandler: ReturnType<typeof import('./use
         console.log('检测到首次启动，标记应用已初始化')
         markAsInitialized()
       }
-
-      // 自动检查版本更新并弹窗（非阻塞）
-      autoCheckUpdate().catch(() => {
-        // 静默处理版本检查失败
-      })
 
       // 结束初始化状态
       isInitializing.value = false
